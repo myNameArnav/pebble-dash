@@ -1139,7 +1139,9 @@
     }
 
     const THREAD_URL = 'https://www.reddit.com/r/pebble/comments/1sjk3c7/shipping_mega_thread';
-    const THREAD_JSON_URL = `${THREAD_URL}.json?raw_json=1`;
+    const THREAD_JSON_URL = `${THREAD_URL}.json?raw_json=1&limit=500`;
+    const MORECHILDREN_URL = 'https://www.reddit.com/api/morechildren.json';
+    const MORECHILDREN_BATCH = 100;
 
     let entries = DATA.entries.map(normalizeEntry);
     let post = DATA.post;
@@ -1272,6 +1274,60 @@
       };
     }
 
+    // Reddit's first-page JSON caps the inlined comments well below ?limit=500;
+    // anything beyond that is stubbed as a `kind: "more"` object holding only
+    // the missing comment IDs. Calling /api/morechildren resolves those stubs
+    // so the dashboard sees every top-level report instead of just the first
+    // page. Replies are intentionally ignored — we only care about parents.
+    async function expandTopLevelComments(linkId, initialChildren) {
+      const out = [];
+      const queue = [];
+      for (const child of initialChildren) {
+        if (child.kind === 't1') {
+          out.push(child);
+        } else if (child.kind === 'more' && Array.isArray(child.data?.children)) {
+          queue.push(...child.data.children);
+        }
+      }
+
+      while (queue.length > 0) {
+        const ids = queue.splice(0, MORECHILDREN_BATCH);
+        const url = `${MORECHILDREN_URL}?api_type=json&link_id=${linkId}&children=${ids.join(',')}&raw_json=1`;
+        let data;
+        try {
+          const resp = await fetch(url, {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store'
+          });
+          if (!resp.ok) {
+            console.warn(`morechildren HTTP ${resp.status}; keeping ${out.length} top-level comments fetched so far`);
+            break;
+          }
+          data = await resp.json();
+        } catch (error) {
+          console.warn('morechildren fetch failed; keeping what we have', error);
+          break;
+        }
+        const things = data?.json?.data?.things || [];
+        for (const thing of things) {
+          // Only keep top-level: parent_id === t3_<post_id>. Replies that
+          // tagged along in the response (and nested `more` stubs that aren't
+          // top-level continuations) are skipped.
+          if (thing.kind === 't1' && thing.data?.parent_id === linkId) {
+            out.push(thing);
+          } else if (
+            thing.kind === 'more' &&
+            thing.data?.parent_id === linkId &&
+            Array.isArray(thing.data.children)
+          ) {
+            queue.push(...thing.data.children);
+          }
+        }
+      }
+
+      return out;
+    }
+
     async function loadLiveData() {
       const response = await fetch(THREAD_JSON_URL, {
         headers: { Accept: 'application/json' },
@@ -1281,6 +1337,14 @@
         throw new Error(`Reddit fetch failed: ${response.status}`);
       }
       const payload = await response.json();
+      const postData = payload[0]?.data?.children?.[0]?.data;
+      if (postData?.id && payload[1]?.data) {
+        const linkId = `t3_${postData.id}`;
+        payload[1].data.children = await expandTopLevelComments(
+          linkId,
+          payload[1].data.children || []
+        );
+      }
       return parseRedditThread(payload);
     }
 
