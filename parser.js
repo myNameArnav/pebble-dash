@@ -155,14 +155,25 @@ function inferBatch(entry, text) {
   return match ? `Batch ${match[1]}` : (entry.batch || 'Unknown');
 }
 
+function dateKeyFromDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 function parseDateString(value, options = {}) {
   if (!value) return null;
-  const { preferDayFirst = false } = options;
+  const { fallbackYear = null, preferDayFirst = false } = options;
+  const today = dateKeyFromDate(new Date());
   const cleaned = String(value)
     .replace(/(\d+)(st|nd|rd|th)/gi, '$1')
     .replace(/[@,]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+  const validDate = (year, month, day) => {
+    if (year < 2025 || year > 2027) return null;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return dateKey <= today ? dateKey : null;
+  };
 
   const numeric = cleaned.match(/\b(\d{1,4})[\/.-](\d{1,2})[\/.-](\d{2,4})\b/);
   if (numeric) {
@@ -194,9 +205,7 @@ function parseDateString(value, options = {}) {
     } else {
       return null;
     }
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    }
+    return validDate(year, month, day);
   }
 
   const monthMap = {
@@ -213,8 +222,8 @@ function parseDateString(value, options = {}) {
     nov: 11, november: 11,
     dec: 12, december: 12
   };
-  const monthFirst = cleaned.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b[\s,.-]+(\d{1,2})(?:st|nd|rd|th)?[\s,.-]+(\d{2,4})/i);
-  const dayFirst = cleaned.match(/\b(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)?,?\s*(\d{1,2})(?:st|nd|rd|th)?[\s,.-]+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b[\s,.-]+(\d{2,4})/i);
+  const monthFirst = cleaned.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b[\s,.-]+(\d{1,2})(?:st|nd|rd|th)?[\s,.-]+(\d{2,4})(?!\s*:)/i);
+  const dayFirst = cleaned.match(/\b(?:mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)?,?\s*(\d{1,2})(?:st|nd|rd|th)?[\s,.-]+(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b[\s,.-]+(\d{2,4})(?!\s*:)/i);
   const parts = monthFirst
     ? { month: monthMap[monthFirst[1].toLowerCase()], day: Number(monthFirst[2]), year: Number(monthFirst[3]) }
     : dayFirst
@@ -222,8 +231,13 @@ function parseDateString(value, options = {}) {
       : null;
   if (parts) {
     const year = parts.year < 100 ? parts.year + (parts.year >= 70 ? 1900 : 2000) : parts.year;
-    if (parts.month >= 1 && parts.month <= 12 && parts.day >= 1 && parts.day <= 31) {
-      return `${year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+    return validDate(year, parts.month, parts.day);
+  }
+
+  if (fallbackYear) {
+    const monthDay = cleaned.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b[\s,.-]+(\d{1,2})(?:st|nd|rd|th)?\b/i);
+    if (monthDay) {
+      return validDate(fallbackYear, monthMap[monthDay[1].toLowerCase()], Number(monthDay[2]));
     }
   }
   return null;
@@ -231,9 +245,14 @@ function parseDateString(value, options = {}) {
 
 function extractDateFromLines(lines, patterns, options = {}) {
   for (const line of lines) {
-    if (!patterns.some(pattern => pattern.test(line))) continue;
-    const parsed = parseDateString(line, options);
-    if (parsed) return parsed;
+    for (const pattern of patterns) {
+      const match = line.match(pattern);
+      if (!match) continue;
+      const beforeMatch = line.slice(0, match.index);
+      const nearbyBefore = beforeMatch.split(/\bedit\s*\d*\s*[-:]|[.;]/i).pop() || '';
+      const parsed = parseDateString(line.slice(match.index), options) || parseDateString(nearbyBefore, options);
+      if (parsed) return parsed;
+    }
   }
   return null;
 }
@@ -317,6 +336,8 @@ function inferStatus(entry, lines, text, confirmDate, shippingDate) {
 function normalizeEntry(entry) {
   const lines = cleanLines(entry.body);
   const text = cleanBodyText(entry.body);
+  const createdYear = entry.created ? new Date(entry.created).getUTCFullYear() : null;
+  const fallbackYear = createdYear >= 2025 && createdYear <= 2027 ? createdYear : null;
   const country = inferCountry(entry, lines, text);
   const preferDayFirstDates = country !== 'US' && (
     country !== 'Unknown' ||
@@ -327,20 +348,20 @@ function normalizeEntry(entry) {
   const orderDate = entry.orderDate || extractDateFromLines(lines, [
     /\border(?:ed| date| time| date\/time)?\b/i,
     /\bpre-?order(?:ed)?\b/i
-  ], { preferDayFirst: preferDayFirstDates });
+  ], { fallbackYear, preferDayFirst: preferDayFirstDates });
   const confirmDate = entry.confirmDate || extractDateFromLines(lines, [
     /\bconfirm/i,
     /\bconfirmation\b/i,
     /\bcomplete your order\b/i,
     /\bfinalize order\b/i
-  ], { preferDayFirst: preferDayFirstDates });
+  ], { fallbackYear, preferDayFirst: preferDayFirstDates });
   const shippingDate = entry.shippingDate || extractDateFromLines(linesWithoutNegativeShippingUpdates(lines), [
     /\bshipping\b/i,
     /\bshipment\b/i,
     /\bshipped\b/i,
     /\btracking\b/i,
     /\bdelivered\b/i
-  ]);
+  ], { fallbackYear, preferDayFirst: preferDayFirstDates });
 
   return {
     ...entry,

@@ -407,16 +407,31 @@ function chartCountries(data) {
 
 function chartTimeline(data) {
   destroyChart('timeline');
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const normalizeChartDate = value => {
+    if (!value) return null;
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return null;
+    const d = `${match[1]}-${match[2]}-${match[3]}`;
+    if (d > todayKey) return null;
+    const time = Date.parse(`${d}T00:00:00Z`);
+    return Number.isFinite(time) ? d : null;
+  };
   const groupByDate = field => {
     const days = {};
-    data.forEach(e => { if (!e[field]) return; const d = e[field].split('T')[0]; days[d] = (days[d] || 0) + 1; });
+    data.forEach(e => {
+      const d = normalizeChartDate(e[field]);
+      if (!d) return;
+      days[d] = (days[d] || 0) + 1;
+    });
     return days;
   };
   const ordersByDay = groupByDate('orderDate');
   const confirmsByDay = groupByDate('confirmDate');
   const shipsByDay = groupByDate('shippingDate');
   const allDates = new Set([...Object.keys(ordersByDay), ...Object.keys(confirmsByDay), ...Object.keys(shipsByDay)]);
-  const sortedDates = [...allDates].sort();
+  const sortedDates = [...allDates].sort((a, b) => Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`));
   let o = 0, c = 0, s = 0;
   const cumO = [], cumC = [], cumS = [];
   sortedDates.forEach(d => {
