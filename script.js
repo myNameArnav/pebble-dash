@@ -309,11 +309,14 @@ function isLikelyReport(entry) {
 
 const THREAD_URL = 'https://www.reddit.com/r/pebble/comments/1sjk3c7/shipping_mega_thread';
 const THREAD_JSON_URL = `${THREAD_URL}.json`;
+const MORECHILDREN_URL = 'https://www.reddit.com/api/morechildren.json';
+const MORECHILDREN_BATCH = 100;
 const REDDIT_PAGE_DELAY_MS = 1000;
 
 let entries = DATA.entries.map(normalizeEntry);
 let post = DATA.post;
 let dataSource = 'loading';
+let loadingMessage = '';
 
 // ── Color Palette ──────────────────────────────────────────────────────────
 const colors = {
@@ -446,6 +449,15 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function setLoadingStatus(message) {
+  loadingMessage = message;
+  const el = document.getElementById('loading-status');
+  const text = document.getElementById('loading-status-text');
+  if (!el || !text) return;
+  el.hidden = !message;
+  text.textContent = message || '';
+}
+
 async function fetchRedditPage(after) {
   const params = new URLSearchParams({
     limit: '100',
@@ -473,6 +485,7 @@ async function fetchAllTopLevelCommentPages() {
 
   do {
     if (after) await delay(REDDIT_PAGE_DELAY_MS);
+    setLoadingStatus(after ? 'Fetching next Reddit comment page…' : 'Fetching Reddit data…');
     const payload = await fetchRedditPage(after);
     if (!Array.isArray(payload) || payload.length < 2 || !payload[1]?.data) {
       throw new Error('Unexpected Reddit comments payload');
@@ -480,6 +493,7 @@ async function fetchAllTopLevelCommentPages() {
     if (!firstPayload) firstPayload = payload;
     children.push(...(payload[1].data.children || []));
     after = payload[1].data.after || null;
+    setLoadingStatus(`Fetched ${children.length} top-level comments…`);
   } while (after);
 
   if (firstPayload?.[1]?.data) {
@@ -489,8 +503,70 @@ async function fetchAllTopLevelCommentPages() {
   return firstPayload;
 }
 
+async function expandTopLevelMoreChildren(linkId, initialChildren) {
+  const out = [];
+  const queue = [];
+
+  for (const child of initialChildren) {
+    if (child.kind === 't1') {
+      out.push(child);
+    } else if (
+      child.kind === 'more' &&
+      child.data?.parent_id === linkId &&
+      Array.isArray(child.data.children)
+    ) {
+      queue.push(...child.data.children);
+    }
+  }
+
+  while (queue.length > 0) {
+    const ids = queue.splice(0, MORECHILDREN_BATCH);
+    setLoadingStatus(`Fetching ${ids.length} more top-level comments…`);
+    await delay(REDDIT_PAGE_DELAY_MS);
+
+    const params = new URLSearchParams({
+      api_type: 'json',
+      link_id: linkId,
+      children: ids.join(','),
+      raw_json: '1'
+    });
+    const response = await fetch(`${MORECHILDREN_URL}?${params}`, {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store'
+    });
+    if (!response.ok) {
+      console.warn(`morechildren HTTP ${response.status}; keeping ${out.length} top-level comments fetched so far`);
+      break;
+    }
+
+    const data = await response.json();
+    const things = data?.json?.data?.things || [];
+    for (const thing of things) {
+      if (thing.kind === 't1' && thing.data?.parent_id === linkId) {
+        out.push(thing);
+      } else if (
+        thing.kind === 'more' &&
+        thing.data?.parent_id === linkId &&
+        Array.isArray(thing.data.children)
+      ) {
+        queue.push(...thing.data.children);
+      }
+    }
+    setLoadingStatus(`Fetched ${out.length} top-level comments…`);
+  }
+
+  return out;
+}
+
 async function loadLiveData() {
   const payload = await fetchAllTopLevelCommentPages();
+  const postData = payload[0]?.data?.children?.[0]?.data;
+  if (postData?.id && payload[1]?.data) {
+    payload[1].data.children = await expandTopLevelMoreChildren(
+      `t3_${postData.id}`,
+      payload[1].data.children || []
+    );
+  }
   return parseRedditThread(payload);
 }
 
@@ -499,7 +575,7 @@ function renderPostInfo() {
   const parts = ['r/pebble'];
   if (post && post.created) parts.push(`posted ${new Date(post.created).toLocaleDateString()}`);
   parts.push(`${entries.length} reports ingested`);
-  parts.push(dataSource === 'live' ? 'live from Reddit' : dataSource === 'loading' ? 'loading…' : 'offline');
+  parts.push(dataSource === 'live' ? 'live from Reddit' : dataSource === 'loading' ? (loadingMessage || 'fetching Reddit data…') : 'offline');
   document.getElementById('post-info').textContent = parts.join(' · ');
 }
 
@@ -977,18 +1053,21 @@ function renderAll() {
 
 async function init() {
   renderFilterChips();
+  setLoadingStatus('Fetching Reddit data…');
   renderAll();
   try {
     const live = await loadLiveData();
     post = live.post;
     entries = live.entries;
     dataSource = 'live';
+    setLoadingStatus('');
     expandedRows.clear();
     renderFilterChips();
     renderAll();
   } catch (error) {
     console.error(error);
     dataSource = 'failed';
+    setLoadingStatus('');
     renderAll();
   }
 }

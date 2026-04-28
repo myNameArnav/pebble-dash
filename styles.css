@@ -77,6 +77,42 @@ header .subtitle {
   letter-spacing: 0.03em;
 }
 
+.loading-status {
+  width: fit-content;
+  max-width: min(100%, 520px);
+  margin: 0.9rem auto 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text-dim);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.78rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.loading-status[hidden] {
+  display: none;
+}
+
+.loading-spinner {
+  width: 0.8rem;
+  height: 0.8rem;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  flex: 0 0 auto;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .progress-wrap {
   max-width: 700px;
   margin: 1.75rem auto 0;
