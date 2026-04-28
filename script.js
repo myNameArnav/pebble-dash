@@ -168,7 +168,6 @@ function parseDateString(value) {
     let a = Number(numeric[1]);
     let b = Number(numeric[2]);
     let c = Number(numeric[3]);
-    if (c < 100) c += c >= 70 ? 1900 : 2000;
     let year;
     let month;
     let day;
@@ -177,10 +176,12 @@ function parseDateString(value) {
       month = b;
       day = c;
     } else if (a > 12) {
+      if (c < 100) c += c >= 70 ? 1900 : 2000;
       day = a;
       month = b;
       year = c;
     } else if (b > 12) {
+      if (c < 100) c += c >= 70 ? 1900 : 2000;
       month = a;
       day = b;
       year = c;
@@ -231,7 +232,23 @@ function extractDateFromLines(lines, patterns) {
   return null;
 }
 
+function hasNegativeFieldValue(lines, fieldPattern) {
+  const negativeValue = /\b(?:not\s+yet|no|nope|none|n\/a|na|pending|waiting|tbd|false)\b/i;
+  return lines.some(line => {
+    const isField = new RegExp(`^[-\\s]*(?:${fieldPattern})\\s*(?:[:=-]|\\b)`, 'i').test(line);
+    return isField && negativeValue.test(line);
+  });
+}
+
+function withoutNegativeFieldLines(lines, fieldPattern) {
+  return lines
+    .filter(line => !hasNegativeFieldValue([line], fieldPattern))
+    .join(' ');
+}
+
 function inferStatus(entry, lines, text, confirmDate, shippingDate) {
+  const shippingNegative = hasNegativeFieldValue(lines, 'shipped|shipping');
+  const confirmationNegative = hasNegativeFieldValue(lines, 'confirmation|confirmed|confirm');
   const waitingPatterns = [
     /\bno shipping email yet\b/i,
     /\bno shipping notification yet\b/i,
@@ -244,13 +261,19 @@ function inferStatus(entry, lines, text, confirmDate, shippingDate) {
     /\bno communication yet\b/i,
     /\bwaiting\b/i
   ];
-  if (waitingPatterns.some(pattern => pattern.test(text))) return 'Waiting';
-  if (shippingDate) return 'Shipped';
-  if (/\b(?:shipping label created|shipment notification|tracking number|out for delivery|delivered|in transit|your watch has shipped|shipping email received|shipped on)\b/i.test(text)) {
+  if (waitingPatterns.some(pattern => pattern.test(text)) || (shippingNegative && (confirmationNegative || !confirmDate))) {
+    return 'Waiting';
+  }
+  if (shippingDate && !shippingNegative) return 'Shipped';
+
+  const positiveText = withoutNegativeFieldLines(lines, 'shipped|shipping|delivered');
+  if (/\b(?:shipping label created|shipment notification|tracking number|out for delivery|delivered|in transit|your watch has shipped|shipping email received|shipped on)\b/i.test(positiveText)) {
     return 'Shipped';
   }
-  if (confirmDate) return 'Confirmed';
-  if (/\b(?:confirmation email|confirm email|confirmation received|order confirmation|address confirmed|color confirmed|colour confirmed|complete your order|finalize order|confirm choices|received.*email)\b/i.test(text)) {
+  if (confirmDate && !confirmationNegative) return 'Confirmed';
+
+  const confirmationText = withoutNegativeFieldLines(lines, 'confirmation|confirmed|confirm');
+  if (/\b(?:confirmation email|confirm email|confirmation received|order confirmation|address confirmed|color confirmed|colour confirmed|complete your order|finalize order|confirm choices|received.*email)\b/i.test(confirmationText)) {
     return 'Confirmed';
   }
   return entry.status || 'Unknown';
