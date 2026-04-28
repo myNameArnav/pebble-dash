@@ -151,7 +151,7 @@ function inferColor(entry, text) {
 
 function inferBatch(entry, text) {
   if (entry.batch && entry.batch !== 'Unknown') return entry.batch;
-  const match = text.match(/\bbatch\s*([1-5])\b/i);
+  const match = text.match(/\bbatch\s*[:#-]?\s*([1-5])\b/i);
   return match ? `Batch ${match[1]}` : (entry.batch || 'Unknown');
 }
 
