@@ -134,10 +134,10 @@ function inferDevice(entry, text) {
 function inferColor(entry, text) {
   const source = `${entry.color && entry.color !== 'Unknown' ? entry.color + ' ' : ''}${text}`;
   const patterns = [
-    [/black\s*[\/-]?\s*(?:grey|gray)|(?:grey|gray)\s*[\/-]?\s*black|black\s*[\/-]?\s*black|\bblack\s+watch\b|\bblack\b(?!\s*(?:\/|-)?\s*(?:red|blue))/i, 'Black/Grey'],
-    [/black\s*[\/-]?\s*blue|blue\s*[\/-]?\s*black|silver\s*[\/-]?\s*blue|blue\s*[\/-]?\s*silver/i, 'Black/Blue'],
-    [/black\s*[\/-]?\s*red|red\s*[\/-]?\s*black|silver\s*[\/-]?\s*red|red\s*[\/-]?\s*silver/i, 'Black/Red'],
-    [/silver\s*[\/-]?\s*(?:grey|gray)|(?:grey|gray)\s*[\/-]?\s*silver|gray\s+silver|\bwhite\b|\bsilver\b/i, 'Silver']
+    [/black\s*[\/-]?\s*(?:grey|gray)|(?:grey|gray)\s*[\/-]?\s*black|black\s*[\/-]?\s*black|\bblack\b(?!\s*(?:\/|-)?\s*(?:red|blue))/i, 'Black/Grey'],
+    [/silver\s*[\/-]?\s*(?:grey|gray)|(?:grey|gray)\s*[\/-]?\s*silver|gray\s+silver|\bwhite\b|\bsilver\b(?!\s*(?:\/|-)?\s*blue)/i, 'Silver/Grey'],
+    [/black\s*[\/-]?\s*red|red\s*[\/-]?\s*black/i, 'Black/Red'],
+    [/silver\s*[\/-]?\s*blue|blue\s*[\/-]?\s*silver/i, 'Silver/Blue']
   ];
   for (const [pattern, value] of patterns) {
     if (pattern.test(source)) return value;

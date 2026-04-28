@@ -18,7 +18,7 @@ const colors = {
   choropleth: ['#4ECDC4', '#74C0FC', '#B197FC', '#F783AC', '#FFA94D', '#69DB7C', '#FFD43B', '#FF6B6B', '#a0e7e5', '#c4b5fd', '#fbbf24', '#fb7185'],
   batch: { 'Batch 1': '#4ECDC4', 'Batch 2': '#B197FC', 'Batch 3': '#FFA94D', 'Batch 4': '#F783AC', 'Batch 5': '#FF6B6B' },
   device: { 'Pebble Duo 2': '#FFA94D', 'Pebble Time 2': '#4ECDC4', 'Pebble Round': '#74C0FC', 'Pebble Index': '#B197FC', 'Unknown': '#8888aa' },
-  colorVar: { 'Black/Grey': '#555', 'Silver': '#c0c0c0', 'Black/Blue': '#4DABF7', 'Black/Red': '#FF6B6B', 'Unknown': '#666' }
+  colorVar: { 'Black/Grey': '#555', 'Silver/Grey': '#c0c0c0', 'Black/Red': '#FF6B6B', 'Silver/Blue': '#4DABF7', 'Unknown': '#666' }
 };
 
 // ── Chart.js Defaults ──────────────────────────────────────────────────────
@@ -356,7 +356,7 @@ function chartStatus(data) {
 function chartDeviceColor(data) {
   destroyChart('deviceColor');
   const devices = [...new Set(data.map(e => e.device))].filter(d => d !== 'Unknown');
-  const colorKeys = ['Black/Grey', 'Silver', 'Black/Blue', 'Black/Red', 'Unknown'];
+  const colorKeys = ['Black/Grey', 'Silver/Grey', 'Black/Red', 'Silver/Blue', 'Unknown'];
   const datasets = colorKeys.map(ck => ({
     label: ck,
     data: devices.map(d => data.filter(e => e.device === d && e.color === ck).length),
