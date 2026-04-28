@@ -16,6 +16,10 @@ function cleanLines(body) {
     .filter(Boolean);
 }
 
+function isTipsPost(body) {
+  return /^\s*(?:[*_~`>#\-\s]+)?tips(?:\s*[*_~`]+)?\s*:?\b/i.test(String(body || ''));
+}
+
 function normalizeCountry(value) {
   const v = String(value || '').trim().toLowerCase();
   const aliases = {
@@ -352,6 +356,8 @@ function normalizeEntry(entry) {
 }
 
 function isLikelyReport(entry) {
+  if (isTipsPost(entry.body)) return false;
+
   const hasTimelineSignal = Boolean(
     entry.orderDate ||
     entry.confirmDate ||
