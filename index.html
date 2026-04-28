@@ -1197,32 +1197,56 @@
     }
 
     // ── Reddit fetch & parsing ─────────────────────────────────────────────────
-    function parseCommentNode(node, acc) {
+    // Only top-level comments are treated as reports. Replies are usually
+    // follow-up questions ("what country?") rather than fresh reports, so
+    // walking into c.replies just inflates counts and double-attributes users.
+    function parseTopLevelComment(node, acc) {
       if (!node || node.kind !== 't1' || !node.data) return;
       const c = node.data;
-      if (c.author && c.body && c.body !== '[deleted]' && c.body !== '[removed]') {
-        const normalized = normalizeEntry({
-          author: c.author,
-          created: new Date((c.created_utc || 0) * 1000).toISOString(),
-          score: c.score || 0,
-          device: 'Unknown',
-          color: 'Unknown',
-          country: 'Unknown',
-          batch: 'Unknown',
-          status: 'Unknown',
-          orderDate: null,
-          confirmDate: null,
-          shippingDate: null,
-          body: c.body
-        });
-        if (isLikelyReport(normalized)) {
-          acc.push(normalized);
+      if (!c.author || !c.body || c.body === '[deleted]' || c.body === '[removed]') return;
+      const normalized = normalizeEntry({
+        author: c.author,
+        created: new Date((c.created_utc || 0) * 1000).toISOString(),
+        score: c.score || 0,
+        device: 'Unknown',
+        color: 'Unknown',
+        country: 'Unknown',
+        batch: 'Unknown',
+        status: 'Unknown',
+        orderDate: null,
+        confirmDate: null,
+        shippingDate: null,
+        body: c.body
+      });
+      if (isLikelyReport(normalized)) {
+        acc.push(normalized);
+      }
+    }
+
+    // Shipping status progresses forward over time: a user's later comment is
+    // almost always more informative than their earlier one. When the same
+    // author posts multiple top-level reports, prefer the most advanced status,
+    // breaking ties by recency, then by score.
+    const STATUS_RANK = { Shipped: 3, Confirmed: 2, Waiting: 1, Unknown: 0 };
+
+    function compareEntries(a, b) {
+      const rankDiff = (STATUS_RANK[a.status] || 0) - (STATUS_RANK[b.status] || 0);
+      if (rankDiff !== 0) return rankDiff;
+      const aTime = a.created ? Date.parse(a.created) : 0;
+      const bTime = b.created ? Date.parse(b.created) : 0;
+      if (aTime !== bTime) return aTime - bTime;
+      return (a.score || 0) - (b.score || 0);
+    }
+
+    function dedupeByAuthor(entries) {
+      const byAuthor = new Map();
+      for (const entry of entries) {
+        const existing = byAuthor.get(entry.author);
+        if (!existing || compareEntries(entry, existing) > 0) {
+          byAuthor.set(entry.author, entry);
         }
       }
-      const replies = c.replies && c.replies.data && Array.isArray(c.replies.data.children)
-        ? c.replies.data.children
-        : [];
-      replies.forEach(reply => parseCommentNode(reply, acc));
+      return [...byAuthor.values()];
     }
 
     function parseRedditThread(payload) {
@@ -1235,15 +1259,16 @@
       }
       const parsedEntries = [];
       const commentNodes = payload[1]?.data?.children || [];
-      commentNodes.forEach(node => parseCommentNode(node, parsedEntries));
+      commentNodes.forEach(node => parseTopLevelComment(node, parsedEntries));
+      const dedupedEntries = dedupeByAuthor(parsedEntries);
       return {
         post: {
           title: postData.title,
           created: new Date((postData.created_utc || 0) * 1000).toISOString(),
           score: postData.score || 0,
-          numComments: postData.num_comments || parsedEntries.length
+          numComments: postData.num_comments || dedupedEntries.length
         },
-        entries: parsedEntries
+        entries: dedupedEntries
       };
     }
 
