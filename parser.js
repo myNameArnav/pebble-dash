@@ -21,12 +21,22 @@ function isTipsPost(body) {
 }
 
 function normalizeCountry(value) {
-  const v = String(value || '').trim().toLowerCase();
+  const v = String(value || '')
+    .replace(/[(),]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
   const aliases = {
-    us: 'US', usa: 'US', 'united states': 'US', 'united states of america': 'US',
-    uk: 'UK', 'united kingdom': 'UK', 'england': 'UK', 'great britain': 'UK',
+    us: 'US', usa: 'US', 'united states': 'US', 'united states usa': 'US',
+    'united states of america': 'US',
+    uk: 'UK', gb: 'UK', gbr: 'UK', 'united kingdom': 'UK', 'england': 'UK', 'great britain': 'UK',
     scotland: 'UK', wales: 'UK', 'northern ireland': 'UK',
+    au: 'Australia', aus: 'Australia',
     de: 'Germany', deu: 'Germany',
+    cl: 'Chile', chl: 'Chile',
+    fr: 'France', fra: 'France',
+    hu: 'Hungary', hun: 'Hungary', 'hungary hu': 'Hungary',
+    nl: 'Netherlands', nld: 'Netherlands', 'the netherlands': 'Netherlands',
     uae: 'UAE', 'united arab emirates': 'UAE',
     dprk: 'North Korea', drc: 'DR Congo', 'democratic republic of the congo': 'DR Congo',
     holland: 'Netherlands', czechia: 'Czech Republic',
@@ -45,6 +55,7 @@ function normalizeCountry(value) {
     'sao tome': 'Sao Tome and Principe',
     papua: 'Papua New Guinea', 'the gambia': 'Gambia',
   };
+  if (/\b(?:us|usa|united states)\b/i.test(v)) return 'US';
   return aliases[v] || toTitleCase(v);
 }
 
@@ -52,7 +63,7 @@ function inferCountry(entry, lines, text) {
   if (entry.country && entry.country !== 'Unknown') return entry.country;
 
   const countryPatterns = [
-    /\b(?:location|region|country|destination|delivery to|shipping to|ship to)\s*[:\-]?\s*([A-Za-z][A-Za-z .-]{1,40})\b/i
+    /\b(?:location|region|country|destination|delivery to|shipping to|ship to)\s*[:\-]?\s*([A-Za-z][A-Za-z .,()-]{1,60})\b/i
   ];
   const countryNames = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
@@ -111,7 +122,7 @@ function inferCountry(entry, lines, text) {
       }
     }
     const normalizedLine = normalizeCountry(line);
-    if (/^(?:us|usa|uk|uae|de|deu)$/i.test(line)) {
+    if (/^(?:us|usa|uk|gb|gbr|uae|au|aus|de|deu|cl|chl|fr|fra|hu|hun|nl|nld)$/i.test(line)) {
       return normalizedLine;
     }
     if (countryNames.some(name => new RegExp(`^${name}$`, 'i').test(line))) {
