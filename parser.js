@@ -26,6 +26,7 @@ function normalizeCountry(value) {
     us: 'US', usa: 'US', 'united states': 'US', 'united states of america': 'US',
     uk: 'UK', 'united kingdom': 'UK', 'england': 'UK', 'great britain': 'UK',
     scotland: 'UK', wales: 'UK', 'northern ireland': 'UK',
+    de: 'Germany', deu: 'Germany',
     uae: 'UAE', 'united arab emirates': 'UAE',
     dprk: 'North Korea', drc: 'DR Congo', 'democratic republic of the congo': 'DR Congo',
     holland: 'Netherlands', czechia: 'Czech Republic',
@@ -102,8 +103,12 @@ function inferCountry(entry, lines, text) {
       const match = line.match(pattern);
       if (!match) continue;
       const value = match[1].trim().replace(/[.,]+$/, '');
+      const normalized = normalizeCountry(value);
+      if (normalized !== value || ['US', 'UK', 'UAE'].includes(normalized)) {
+        return normalized;
+      }
       if (countryNames.some(name => new RegExp(`^${name}$`, 'i').test(value))) {
-        return normalizeCountry(value);
+        return normalized;
       }
     }
     if (countryNames.some(name => new RegExp(`^${name}$`, 'i').test(line))) {
@@ -301,6 +306,7 @@ function inferStatus(entry, lines, text, confirmDate, shippingDate) {
   const waitingPatterns = [
     /\bno shipping email yet\b/i,
     /\bno shipping notification yet\b/i,
+    /\bno shipping confirmation yet\b/i,
     /\bno confirmation email\b/i,
     /\bno email yet\b/i,
     /\bstill no email\b/i,
