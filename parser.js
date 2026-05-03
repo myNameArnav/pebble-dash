@@ -52,8 +52,7 @@ function inferCountry(entry, lines, text) {
   if (entry.country && entry.country !== 'Unknown') return entry.country;
 
   const countryPatterns = [
-    /\b(?:location|region|country|destination|delivery to|shipping to|ship to)\s*[:\-]?\s*([A-Za-z][A-Za-z .-]{1,40})\b/i,
-    /\b(?:europe\s*-\s*)?([A-Za-z][A-Za-z .-]{1,40})\b/
+    /\b(?:location|region|country|destination|delivery to|shipping to|ship to)\s*[:\-]?\s*([A-Za-z][A-Za-z .-]{1,40})\b/i
   ];
   const countryNames = [
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
@@ -111,8 +110,12 @@ function inferCountry(entry, lines, text) {
         return normalized;
       }
     }
+    const normalizedLine = normalizeCountry(line);
+    if (/^(?:us|usa|uk|uae|de|deu)$/i.test(line)) {
+      return normalizedLine;
+    }
     if (countryNames.some(name => new RegExp(`^${name}$`, 'i').test(line))) {
-      return normalizeCountry(line);
+      return normalizedLine;
     }
   }
 
