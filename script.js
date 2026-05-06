@@ -91,9 +91,8 @@ function parseTopLevelComment(node, acc) {
 }
 
 // Shipping status progresses forward over time: a user's later comment is
-// almost always more informative than their earlier one. When the same
-// author posts multiple top-level reports, prefer the most advanced status,
-// breaking ties by recency, then by score.
+// almost always more informative than their earlier one. Keep one row per
+// author unless the same author has multiple known, distinct device reports.
 const STATUS_RANK = { Shipped: 3, Confirmed: 2, Waiting: 1, Unknown: 0 };
 
 function compareEntries(a, b) {
@@ -105,15 +104,33 @@ function compareEntries(a, b) {
   return (a.score || 0) - (b.score || 0);
 }
 
-function dedupeByAuthor(entries) {
+function bestEntry(entries) {
+  return entries.reduce((best, entry) => (
+    !best || compareEntries(entry, best) > 0 ? entry : best
+  ), null);
+}
+
+function dedupeByAuthorAndDevice(entries) {
   const byAuthor = new Map();
   for (const entry of entries) {
-    const existing = byAuthor.get(entry.author);
-    if (!existing || compareEntries(entry, existing) > 0) {
-      byAuthor.set(entry.author, entry);
+    const key = String(entry.author || '').toLowerCase();
+    if (!byAuthor.has(key)) byAuthor.set(key, []);
+    byAuthor.get(key).push(entry);
+  }
+
+  const deduped = [];
+  for (const authorEntries of byAuthor.values()) {
+    const knownDeviceEntries = authorEntries.filter(entry => entry.device && entry.device !== 'Unknown');
+    const knownDevices = new Set(knownDeviceEntries.map(entry => entry.device));
+    if (knownDevices.size > 1) {
+      for (const device of knownDevices) {
+        deduped.push(bestEntry(knownDeviceEntries.filter(entry => entry.device === device)));
+      }
+    } else {
+      deduped.push(bestEntry(authorEntries));
     }
   }
-  return [...byAuthor.values()];
+  return deduped.filter(Boolean);
 }
 
 function parseRedditThread(payload) {
@@ -127,7 +144,7 @@ function parseRedditThread(payload) {
   const parsedEntries = [];
   const commentNodes = payload[1]?.data?.children || [];
   commentNodes.forEach(node => parseTopLevelComment(node, parsedEntries));
-  const dedupedEntries = dedupeByAuthor(parsedEntries);
+  const dedupedEntries = dedupeByAuthorAndDevice(parsedEntries);
   return {
     post: {
       title: postData.title,

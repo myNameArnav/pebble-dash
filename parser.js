@@ -140,14 +140,14 @@ function inferCountry(entry, lines, text) {
 
 function inferDevice(entry, text) {
   if (/\b(?:switched|changed|selected)(?:\s+my)?\s+(?:to\s+)?(?:pebble\s+time\s+2|pt2|time\s+2)\b/i.test(text)) return 'Pebble Time 2';
-  if (/\b(?:switched|changed|selected)(?:\s+my)?\s+(?:to\s+)?(?:pebble\s+duo\s*2|pebble\s+time\s+duo\s*2|p2d|duo\s*2|core\s+2\s+duo|c2d)\b/i.test(text)) return 'Pebble Duo 2';
-  if (/\b(?:pebble\s+duo\s*2|pebble\s+time\s+duo\s*2|p2d|duo\s*2|core\s+2\s+duo|c2d)\b/i.test(text)) return 'Pebble Duo 2';
   if (/\b(?:pebble\s+time\s+2|pt2|time\s+2)\b/i.test(text)) return 'Pebble Time 2';
   if (/\b(?:pebble\s+round|round\s*2|pr2)\b/i.test(text)) return 'Pebble Round';
   if (/\b(?:pebble\s+index|index\s*0?1|\bindex\b)\b/i.test(text)) return 'Pebble Index';
+  if (/\b(?:switched|changed|selected)(?:\s+my)?\s+(?:to\s+)?(?:pebble\s+duo\s*2|pebble\s+time\s+duo\s*2|p2d|duo\s*2)\b/i.test(text)) return 'Pebble Duo 2';
+  if (/\b(?:pebble\s+duo\s*2|pebble\s+time\s+duo\s*2|p2d|duo\s*2)\b/i.test(text)) return 'Pebble Duo 2';
   if (entry.device && entry.device !== 'Unknown') {
     if (/time\s+2/i.test(entry.device)) return 'Pebble Time 2';
-    if (/duo/i.test(entry.device) || /core\s+2/i.test(entry.device)) return 'Pebble Duo 2';
+    if (/duo/i.test(entry.device)) return 'Pebble Duo 2';
     if (/round/i.test(entry.device)) return 'Pebble Round';
     if (/index/i.test(entry.device)) return 'Pebble Index';
   }
