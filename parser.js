@@ -240,6 +240,85 @@ function dateKeyFromDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function utcKeyFromDate(date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')} ${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`;
+}
+
+const TZ_OFFSETS_MINUTES = {
+  'UTC': 0, 'GMT': 0,
+  'CET': 60, 'CEST': 120,
+  'EET': 120, 'EEST': 180,
+  'IST': 330,
+  'BST': 60,
+  'WET': 0, 'WEST': 60,
+  'EST': -300, 'EDT': -240, 'ET': -300,
+  'CST': -360, 'CDT': -300, 'CT': -360,
+  'MST': -420, 'MDT': -360, 'MT': -420,
+  'PST': -480, 'PDT': -420, 'PT': -480,
+  'AKST': -540, 'AKDT': -480,
+  'HST': -600,
+  'AST': -240, 'ADT': -180, 'AT': -240,
+  'AEST': 600, 'AEDT': 660,
+  'ACST': 570, 'ACDT': 630,
+  'AWST': 480,
+  'NZST': 720, 'NZDT': 780,
+  'JST': 540, 'KST': 540,
+  'SGT': 480, 'HKT': 480,
+  'MSK': 180,
+  'BRT': -180, 'BRST': -120,
+  'ART': -180, 'CLT': -240, 'CLST': -180,
+};
+
+function parseTimeFromText(fullText) {
+  const timeMatch = fullText.match(/\b(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+  if (!timeMatch) return null;
+
+  let hours = parseInt(timeMatch[1], 10);
+  const minutes = parseInt(timeMatch[2], 10);
+  const seconds = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+  const isPM = timeMatch[4] && timeMatch[4].toLowerCase() === 'pm';
+
+  if (isPM && hours < 12) hours += 12;
+  if (!isPM && hours === 12) hours = 0;
+
+  return { hours, minutes, seconds };
+}
+
+function parseTZOffsetMinutes(fullText) {
+  const gmtMatch = fullText.match(/\bGMT\s*([+-])\s*(\d{1,2})(?::?(\d{2}))?\b/i);
+  const utcOffsetMatch = fullText.match(/\bUTC\s*([+-])\s*(\d{1,2})(?::?(\d{2}))?\b/i);
+  const offsetMatch = gmtMatch || utcOffsetMatch;
+  if (offsetMatch) {
+    const sign = offsetMatch[1] === '-' ? -1 : 1;
+    const hours = parseInt(offsetMatch[2], 10);
+    const mins = offsetMatch[3] ? parseInt(offsetMatch[3], 10) : 0;
+    return sign * (hours * 60 + mins);
+  }
+
+  const abbrPattern = new RegExp('\\b(' + Object.keys(TZ_OFFSETS_MINUTES).sort((a, b) => b.length - a.length).join('|') + ')\\b', 'i');
+  const abbrMatch = fullText.match(abbrPattern);
+  if (abbrMatch) {
+    const tz = abbrMatch[1].toUpperCase();
+    if (tz in TZ_OFFSETS_MINUTES) return TZ_OFFSETS_MINUTES[tz];
+  }
+
+  return null;
+}
+
+function buildUTCDateTimeDisplay(dateKey, fullText) {
+  const timeInfo = parseTimeFromText(fullText);
+  if (!timeInfo) return null;
+
+  const tzOffsetMin = parseTZOffsetMinutes(fullText);
+  if (tzOffsetMin === null) return null;
+
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const localMs = Date.UTC(year, month - 1, day, timeInfo.hours, timeInfo.minutes, timeInfo.seconds);
+  const utcMs = localMs - tzOffsetMin * 60000;
+  const utcDate = new Date(utcMs);
+  return utcKeyFromDate(utcDate) + ' UTC';
+}
+
 function parseDateString(value, options = {}) {
   if (!value) return null;
   const { fallbackYear = null, preferDayFirst = false } = options;
@@ -333,6 +412,35 @@ function extractDateFromLines(lines, patterns, options = {}) {
       const nearbyBefore = beforeMatch.split(/\bedit\s*\d*\s*[-:]|[.;]/i).pop() || '';
       const parsed = parseDateString(line.slice(match.index), options) || parseDateString(nearbyBefore, options);
       if (parsed) return parsed;
+    }
+  }
+  return null;
+}
+
+function extractDateTimeFromLines(lines, patterns, dateKey, options = {}) {
+  if (!dateKey) return null;
+  for (const line of lines) {
+    for (const pattern of patterns) {
+      const match = line.match(pattern);
+      if (!match) continue;
+      const fullMatch = line.slice(match.index);
+      const beforeMatch = line.slice(0, match.index);
+      const nearbyBefore = beforeMatch.split(/\bedit\s*\d*\s*[-:]|[.;]/i).pop() || '';
+
+      const parsedFull = parseDateString(fullMatch, options);
+      if (parsedFull === dateKey) {
+        const dt = buildUTCDateTimeDisplay(dateKey, fullMatch);
+        if (dt) return dt;
+      }
+
+      const parsedNearby = parseDateString(nearbyBefore, options);
+      if (parsedNearby === dateKey) {
+        const dt = buildUTCDateTimeDisplay(dateKey, nearbyBefore);
+        if (dt) return dt;
+      }
+
+      const dt = buildUTCDateTimeDisplay(dateKey, line);
+      if (dt) return dt;
     }
   }
   return null;
@@ -445,6 +553,14 @@ function normalizeEntry(entry) {
     /\bdelivered\b/i
   ], { fallbackYear, preferDayFirst: preferDayFirstDates });
 
+  const orderPatterns = [/\border(?:ed| date| time| date\/time)?\b/i, /\bpre-?order(?:ed)?\b/i];
+  const confirmPatterns = [/\bconfirm/i, /\bconfirmation\b/i, /\bcomplete your order\b/i, /\bfinalize order\b/i];
+  const shippingPatterns = [/\bshipping\b/i, /\bshipment\b/i, /\bshipped\b/i, /\btracking\b/i, /\bdelivered\b/i];
+
+  const orderDateTime = extractDateTimeFromLines(lines, orderPatterns, orderDate, { fallbackYear, preferDayFirst: preferDayFirstDates });
+  const confirmDateTime = extractDateTimeFromLines(lines, confirmPatterns, confirmDate, { fallbackYear, preferDayFirst: preferDayFirstDates });
+  const shippingDateTime = extractDateTimeFromLines(linesWithoutNegativeShippingUpdates(lines), shippingPatterns, shippingDate, { fallbackYear, preferDayFirst: preferDayFirstDates });
+
   return {
     ...entry,
     device: inferDevice(entry, text),
@@ -455,6 +571,9 @@ function normalizeEntry(entry) {
     orderDate,
     confirmDate,
     shippingDate,
+    orderDateTime,
+    confirmDateTime,
+    shippingDateTime,
     status: inferStatus(entry, lines, text, confirmDate, shippingDate)
   };
 }

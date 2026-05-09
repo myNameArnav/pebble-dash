@@ -708,10 +708,10 @@ function renderTable(data) {
     <td>${escapeHtml(e.country)}</td>
     <td>${e.batch !== 'Unknown' ? `<span class="badge ${batchClass(e.batch)}">${e.batch}</span>` : '<span class="badge badge-unknown">Unknown</span>'}</td>
     <td><span class="badge ${badgeClass(e.status)}">${e.status}</span></td>
-    <td>${e.orderDate || '—'}</td>
-    <td>${e.confirmDate || '—'}</td>
+    <td>${e.orderDateTime || e.orderDate || '—'}</td>
+    <td>${e.confirmDateTime || e.confirmDate || '—'}</td>
   </tr>
-  ${isOpen ? `<tr class="expand-row"><td colspan="8"><div class="expand-body"><div class="expand-meta"><span><strong>Posted</strong> ${new Date(e.created).toLocaleString()}</span><span><strong>Score</strong> ${e.score}</span>${e.shippingDate ? `<span><strong>Shipped</strong> ${e.shippingDate}</span>` : ''}</div>${escapeHtml(body)}</div></td></tr>` : ''}
+  ${isOpen ? `<tr class="expand-row"><td colspan="8"><div class="expand-body"><div class="expand-meta"><span><strong>Posted</strong> ${new Date(e.created).toLocaleString()}</span><span><strong>Score</strong> ${e.score}</span>${e.shippingDate ? `<span><strong>Shipped</strong> ${e.shippingDateTime || e.shippingDate}</span>` : ''}</div>${escapeHtml(body)}</div></td></tr>` : ''}
   `;
     }).join('');
   }
