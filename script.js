@@ -585,8 +585,20 @@ function renderCharts(data) {
 function buildChips(containerId, key, label, values) {
   const container = document.getElementById(containerId);
   container.innerHTML = `<span class="filter-label">${label}</span>`;
+  const subset = entries.filter(e => {
+    for (const [k, v] of Object.entries(state.filters)) {
+      if (k === key || v === 'All') continue;
+      if (e[k] !== v) return false;
+    }
+    if (state.search.trim()) {
+      const q = state.search.trim().toLowerCase();
+      const hay = `${e.author} ${e.country} ${e.device} ${e.color} ${e.batch} ${e.body || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
   const counts = {};
-  entries.forEach(e => { counts[e[key]] = (counts[e[key]] || 0) + 1; });
+  subset.forEach(e => { counts[e[key]] = (counts[e[key]] || 0) + 1; });
   if (!values) {
     values = Object.entries(counts)
       .filter(([v]) => v !== 'Unknown')
@@ -780,6 +792,7 @@ document.querySelectorAll('#data-table th').forEach(th => {
 // ── Orchestrator ───────────────────────────────────────────────────────────
 function renderAll() {
   renderPostInfo();
+  renderFilterChips();
   const data = getFiltered();
   renderProgress(data);
   renderStats(data);
