@@ -154,6 +154,68 @@ function inferDevice(entry, text) {
   return 'Unknown';
 }
 
+function inferContinent(country) {
+  if (!country || country === 'Unknown') return 'Unknown';
+  const map = {
+    US: 'North America', Canada: 'North America', Mexico: 'North America',
+    Guatemala: 'North America', Belize: 'North America', Honduras: 'North America',
+    'El Salvador': 'North America', Nicaragua: 'North America', 'Costa Rica': 'North America',
+    Panama: 'North America', Cuba: 'North America', Jamaica: 'North America',
+    Haiti: 'North America', 'Dominican Republic': 'North America', 'Bahamas': 'North America',
+    'Antigua and Barbuda': 'North America', Barbados: 'North America', Dominica: 'North America',
+    Grenada: 'North America', 'Saint Kitts and Nevis': 'North America', 'Saint Lucia': 'North America',
+    'Saint Vincent and the Grenadines': 'North America', 'Trinidad and Tobago': 'North America',
+    Brazil: 'South America', Argentina: 'South America', Chile: 'South America',
+    Colombia: 'South America', Peru: 'South America', Venezuela: 'South America',
+    Ecuador: 'South America', Bolivia: 'South America', Paraguay: 'South America',
+    Uruguay: 'South America', Guyana: 'South America', Suriname: 'South America',
+    UK: 'Europe', Germany: 'Europe', France: 'Europe', Italy: 'Europe', Spain: 'Europe',
+    Netherlands: 'Europe', Belgium: 'Europe', Switzerland: 'Europe', Sweden: 'Europe',
+    Norway: 'Europe', Denmark: 'Europe', Finland: 'Europe', Iceland: 'Europe',
+    Ireland: 'Europe', Portugal: 'Europe', Austria: 'Europe', Poland: 'Europe',
+    'Czech Republic': 'Europe', Slovakia: 'Europe', Hungary: 'Europe', Romania: 'Europe',
+    Bulgaria: 'Europe', Croatia: 'Europe', Slovenia: 'Europe', Serbia: 'Europe',
+    Montenegro: 'Europe', 'Bosnia and Herzegovina': 'Europe', Albania: 'Europe',
+    'North Macedonia': 'Europe', Kosovo: 'Europe', Greece: 'Europe', Cyprus: 'Europe',
+    Malta: 'Europe', Estonia: 'Europe', Latvia: 'Europe', Lithuania: 'Europe',
+    Ukraine: 'Europe', Belarus: 'Europe', Moldova: 'Europe', Russia: 'Europe',
+    Luxembourg: 'Europe', Monaco: 'Europe', 'San Marino': 'Europe', Andorra: 'Europe',
+    Liechtenstein: 'Europe', 'Vatican City': 'Europe',
+    China: 'Asia', Japan: 'Asia', 'South Korea': 'Asia', 'North Korea': 'Asia',
+    India: 'Asia', Pakistan: 'Asia', Bangladesh: 'Asia', 'Sri Lanka': 'Asia',
+    Nepal: 'Asia', Bhutan: 'Asia', Maldives: 'Asia', Afghanistan: 'Asia',
+    Iran: 'Asia', Iraq: 'Asia', Syria: 'Asia', Jordan: 'Asia', Lebanon: 'Asia',
+    Israel: 'Asia', Palestine: 'Asia', 'Saudi Arabia': 'Asia', Yemen: 'Asia',
+    Oman: 'Asia', UAE: 'Asia', Qatar: 'Asia', Kuwait: 'Asia', Bahrain: 'Asia',
+    Turkey: 'Asia', Armenia: 'Asia', Azerbaijan: 'Asia', Georgia: 'Asia',
+    Kazakhstan: 'Asia', Uzbekistan: 'Asia', Turkmenistan: 'Asia', Kyrgyzstan: 'Asia',
+    Tajikistan: 'Asia', Mongolia: 'Asia', Myanmar: 'Asia', Thailand: 'Asia',
+    Vietnam: 'Asia', Laos: 'Asia', Cambodia: 'Asia', Malaysia: 'Asia', Singapore: 'Asia',
+    Indonesia: 'Asia', Philippines: 'Asia', 'Timor-Leste': 'Asia', Brunei: 'Asia',
+    Taiwan: 'Asia',
+    Australia: 'Oceania', 'New Zealand': 'Oceania', Fiji: 'Oceania',
+    'Papua New Guinea': 'Oceania', 'Solomon Islands': 'Oceania', Vanuatu: 'Oceania',
+    Samoa: 'Oceania', Tonga: 'Oceania', Kiribati: 'Oceania', Tuvalu: 'Oceania',
+    Nauru: 'Oceania', 'Marshall Islands': 'Oceania', Palau: 'Oceania', Micronesia: 'Oceania',
+    Egypt: 'Africa', Nigeria: 'Africa', 'South Africa': 'Africa', Kenya: 'Africa',
+    Ethiopia: 'Africa', Tanzania: 'Africa', Uganda: 'Africa', Ghana: 'Africa',
+    Morocco: 'Africa', Algeria: 'Africa', Tunisia: 'Africa', Libya: 'Africa',
+    Senegal: 'Africa', Mali: 'Africa', Niger: 'Africa', Chad: 'Africa',
+    Cameroon: 'Africa', 'DR Congo': 'Africa', Congo: 'Africa', Gabon: 'Africa',
+    Angola: 'Africa', Mozambique: 'Africa', Zimbabwe: 'Africa', Zambia: 'Africa',
+    Malawi: 'Africa', Madagascar: 'Africa', Botswana: 'Africa', Namibia: 'Africa',
+    'South Sudan': 'Africa', Sudan: 'Africa', Somalia: 'Africa', Eritrea: 'Africa',
+    Djibouti: 'Africa', Rwanda: 'Africa', Burundi: 'Africa', 'Burkina Faso': 'Africa',
+    Guinea: 'Africa', 'Guinea-Bissau': 'Africa', 'Ivory Coast': 'Africa',
+    'Sierra Leone': 'Africa', Liberia: 'Africa', 'Equatorial Guinea': 'Africa',
+    Gambia: 'Africa', Benin: 'Africa', Togo: 'Africa', 'Cabo Verde': 'Africa',
+    'Sao Tome and Principe': 'Africa', Eswatini: 'Africa', Lesotho: 'Africa',
+    Mauritius: 'Africa', Seychelles: 'Africa', 'Central African Republic': 'Africa',
+    Comoros: 'Africa', Mauritania: 'Africa',
+  };
+  return map[country] || 'Unknown';
+}
+
 function inferColor(entry, text) {
   const source = `${entry.color && entry.color !== 'Unknown' ? entry.color + ' ' : ''}${text}`;
   const patterns = [
@@ -388,6 +450,7 @@ function normalizeEntry(entry) {
     device: inferDevice(entry, text),
     color: inferColor(entry, text),
     country,
+    continent: inferContinent(country),
     batch: inferBatch(entry, text),
     orderDate,
     confirmDate,

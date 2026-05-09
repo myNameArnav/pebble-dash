@@ -39,7 +39,7 @@ Chart.defaults.plugins.tooltip = Object.assign({}, Chart.defaults.plugins.toolti
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
-  filters: { status: 'All', batch: 'All', device: 'All' },
+  filters: { status: 'All', batch: 'All', device: 'All', color: 'All', continent: 'All' },
   search: '',
   sort: { column: 'created', asc: false },
   page: 1,
@@ -55,6 +55,8 @@ function getFiltered() {
     if (state.filters.status !== 'All' && e.status !== state.filters.status) return false;
     if (state.filters.batch !== 'All' && e.batch !== state.filters.batch) return false;
     if (state.filters.device !== 'All' && e.device !== state.filters.device) return false;
+    if (state.filters.color !== 'All' && e.color !== state.filters.color) return false;
+    if (state.filters.continent !== 'All' && e.continent !== state.filters.continent) return false;
     if (q) {
       const hay = `${e.author} ${e.country} ${e.device} ${e.color} ${e.batch} ${e.body || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -585,6 +587,12 @@ function buildChips(containerId, key, label, values) {
   container.innerHTML = `<span class="filter-label">${label}</span>`;
   const counts = {};
   entries.forEach(e => { counts[e[key]] = (counts[e[key]] || 0) + 1; });
+  if (!values) {
+    values = Object.entries(counts)
+      .filter(([v]) => v !== 'Unknown')
+      .sort((a, b) => b[1] - a[1])
+      .map(([v]) => v);
+  }
   const html = ['<button class="chip active" data-value="All">All</button>']
     .concat(values.map(v =>
       `<button class="chip" data-value="${v}">${v}<span class="count">${counts[v] || 0}</span></button>`
@@ -610,6 +618,8 @@ function renderFilterChips() {
   buildChips('filter-status', 'status', 'Status', ['Shipped', 'Confirmed', 'Waiting', 'Unknown']);
   buildChips('filter-batch', 'batch', 'Batch', ['Batch 1', 'Batch 2', 'Batch 3', 'Batch 4', 'Batch 5']);
   buildChips('filter-device', 'device', 'Device', ['Pebble Duo 2', 'Pebble Time 2', 'Pebble Round', 'Pebble Index']);
+  buildChips('filter-color', 'color', 'Color', ['Black/Grey', 'Silver/Grey', 'Black/Red', 'Silver/Blue']);
+  buildChips('filter-continent', 'continent', 'Continent', ['Africa', 'Asia', 'Europe', 'North America', 'Oceania', 'South America']);
 }
 
 // ── Search (debounced) ────────────────────────────────────────────────────
@@ -625,7 +635,7 @@ document.getElementById('search-input').addEventListener('input', ev => {
 
 // ── Reset ──────────────────────────────────────────────────────────────────
 document.getElementById('filter-reset').addEventListener('click', () => {
-  state.filters = { status: 'All', batch: 'All', device: 'All' };
+  state.filters = { status: 'All', batch: 'All', device: 'All', color: 'All', continent: 'All' };
   state.search = '';
   state.page = 1;
   document.getElementById('search-input').value = '';
