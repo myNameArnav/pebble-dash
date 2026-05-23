@@ -88,9 +88,9 @@
       </div>
       <div class="card">
         <div class="card-head">
-          <h3>Lead Time</h3><span class="card-hint">Order → Confirm (days)</span>
+          <h3>Tax Paid</h3><span class="card-hint">Reported $ buckets</span>
         </div>
-        <div class="chart-wrap"><canvas id="chartLeadTime"></canvas></div>
+        <div class="chart-wrap"><canvas id="chartTax"></canvas></div>
       </div>
       <div class="card wide">
         <div class="card-head">
@@ -116,7 +116,8 @@
               <th data-sort="batch">Batch <span class="sort-icon">↕</span></th>
               <th data-sort="status">Status <span class="sort-icon">↕</span></th>
               <th data-sort="orderDate">Ordered (UTC) <span class="sort-icon">↕</span></th>
-              <th data-sort="confirmDate">Confirmed <span class="sort-icon">↕</span></th>
+              <th data-sort="confirmDate">Confirmed (UTC) <span class="sort-icon">↕</span></th>
+              <th data-sort="taxAmount">Tax <span class="sort-icon">↕</span></th>
             </tr>
           </thead>
           <tbody></tbody>

@@ -238,6 +238,63 @@ function inferBatch(entry, text) {
   return match ? `Batch ${match[1]}` : (entry.batch || 'Unknown');
 }
 
+function parseMoneyAmount(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  let normalized = raw.replace(/\s/g, '');
+  if (/^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(normalized)) {
+    normalized = normalized.replace(/,/g, '');
+  } else if (/^\d+,\d{1,2}$/.test(normalized)) {
+    normalized = normalized.replace(',', '.');
+  } else {
+    normalized = normalized.replace(/,/g, '');
+  }
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function formatTaxDisplay(amount, currency) {
+  if (!Number.isFinite(amount)) return null;
+  const formatted = `$${amount.toLocaleString('en-US', { minimumFractionDigits: amount % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+  return currency && currency !== 'USD' ? `${formatted} ${currency}` : formatted;
+}
+
+function extractTax(entry, lines, text) {
+  if (Number.isFinite(entry.taxAmount)) {
+    return {
+      taxAmount: entry.taxAmount,
+      taxCurrency: entry.taxCurrency || 'USD',
+      taxDisplay: entry.taxDisplay || formatTaxDisplay(entry.taxAmount, entry.taxCurrency || 'USD')
+    };
+  }
+
+  const taxSignal = /\b(?:tax|taxes|duty|duties|tariff|tariffs|tarrif|tarrifs|customs|vat|import\s+fees?|additional\s+charges?)\b/i;
+  const amountPattern = /(?:\$\s*([0-9][0-9.,]*)|(?:USD|CAD)\s*([0-9][0-9.,]*)|([0-9][0-9.,]*)\s*(USD|CAD)\b)/gi;
+  const candidates = lines.filter(line => taxSignal.test(line));
+  if (candidates.length === 0 && taxSignal.test(text)) candidates.push(text);
+
+  for (const line of candidates) {
+    amountPattern.lastIndex = 0;
+    let match;
+    while ((match = amountPattern.exec(line))) {
+      const before = line.slice(Math.max(0, match.index - 12), match.index);
+      if (/\btotal\s*[:(]?\s*$/i.test(before)) continue;
+
+      const amount = parseMoneyAmount(match[1] || match[2] || match[3]);
+      if (!Number.isFinite(amount)) continue;
+
+      const explicitCurrency = match[4] || (/\bCAD\b/i.test(line) ? 'CAD' : /\bUSD\b/i.test(line) ? 'USD' : 'USD');
+      return {
+        taxAmount: amount,
+        taxCurrency: explicitCurrency.toUpperCase(),
+        taxDisplay: formatTaxDisplay(amount, explicitCurrency.toUpperCase())
+      };
+    }
+  }
+
+  return { taxAmount: null, taxCurrency: null, taxDisplay: null };
+}
+
 function dateKeyFromDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -323,7 +380,7 @@ function buildUTCDateTimeDisplay(dateKey, fullText) {
 
 function parseDateString(value, options = {}) {
   if (!value) return null;
-  const { fallbackYear = null, preferDayFirst = false, created = null } = options;
+  const { fallbackYear = null, preferDayFirst = false, created = null, allowAfterCreated = false } = options;
   const today = dateKeyFromDate(new Date());
   const createdDate = created ? created.slice(0, 10) : null;
   const cleaned = String(value)
@@ -336,7 +393,7 @@ function parseDateString(value, options = {}) {
     if (month < 1 || month > 12 || day < 1 || day > 31) return null;
     const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     if (dateKey > today) return null;
-    if (createdDate && dateKey > createdDate) return null;
+    if (!allowAfterCreated && createdDate && dateKey > createdDate) return null;
     return dateKey;
   };
 
@@ -563,22 +620,23 @@ function normalizeEntry(entry) {
     /\bconfirmation\b/i,
     /\bcomplete your order\b/i,
     /\bfinalize order\b/i
-  ], dateOptions);
+  ], { ...dateOptions, allowAfterCreated: true });
   const shippingDate = entry.shippingDate || extractDateFromLines(linesWithoutNegativeShippingUpdates(lines), [
     /\bshipping\b/i,
     /\bshipment\b/i,
     /\bshipped\b/i,
     /\btracking\b/i,
     /\bdelivered\b/i
-  ], dateOptions);
+  ], { ...dateOptions, allowAfterCreated: true });
 
   const orderPatterns = [/\border(?:ed| date| time| date\/time)?\b/i, /\bpre-?order(?:ed)?\b/i];
   const confirmPatterns = [/\bconfirm/i, /\bconfirmation\b/i, /\bcomplete your order\b/i, /\bfinalize order\b/i];
   const shippingPatterns = [/\bshipping\b/i, /\bshipment\b/i, /\bshipped\b/i, /\btracking\b/i, /\bdelivered\b/i];
 
   const orderDateTime = extractDateTimeFromLines(lines, orderPatterns, orderDate, dateOptions);
-  const confirmDateTime = extractDateTimeFromLines(lines, confirmPatterns, confirmDate, dateOptions);
-  const shippingDateTime = extractDateTimeFromLines(linesWithoutNegativeShippingUpdates(lines), shippingPatterns, shippingDate, dateOptions);
+  const confirmDateTime = extractDateTimeFromLines(lines, confirmPatterns, confirmDate, { ...dateOptions, allowAfterCreated: true });
+  const shippingDateTime = extractDateTimeFromLines(linesWithoutNegativeShippingUpdates(lines), shippingPatterns, shippingDate, { ...dateOptions, allowAfterCreated: true });
+  const tax = extractTax(entry, lines, text);
 
   return {
     ...entry,
@@ -593,6 +651,7 @@ function normalizeEntry(entry) {
     orderDateTime,
     confirmDateTime,
     shippingDateTime,
+    ...tax,
     status: inferStatus(entry, lines, text, confirmDate, shippingDate)
   };
 }

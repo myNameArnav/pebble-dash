@@ -45,6 +45,69 @@ const state = {
 const charts = {};
 const expandedRows = new Set();
 
+function parseMoneyAmount(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  let normalized = raw.replace(/\s/g, '');
+  if (/^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(normalized)) {
+    normalized = normalized.replace(/,/g, '');
+  } else if (/^\d+,\d{1,2}$/.test(normalized)) {
+    normalized = normalized.replace(',', '.');
+  } else {
+    normalized = normalized.replace(/,/g, '');
+  }
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function formatTaxDisplay(amount, currency) {
+  if (!Number.isFinite(amount)) return null;
+  const formatted = `$${amount.toLocaleString('en-US', { minimumFractionDigits: amount % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+  return currency && currency !== 'USD' ? `${formatted} ${currency}` : formatted;
+}
+
+function extractTaxFromBody(entry) {
+  if (Number.isFinite(entry.taxAmount)) {
+    const currency = entry.taxCurrency || 'USD';
+    return {
+      ...entry,
+      taxCurrency: currency,
+      taxDisplay: entry.taxDisplay || formatTaxDisplay(entry.taxAmount, currency)
+    };
+  }
+
+  const lines = String(entry.body || '')
+    .split('\n')
+    .map(line => line.replace(/[*_~`>#()[\]]/g, ' ').replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const text = lines.join(' ');
+  const taxSignal = /\b(?:tax|taxes|duty|duties|tariff|tariffs|tarrif|tarrifs|customs|vat|import\s+fees?|additional\s+charges?)\b/i;
+  const amountPattern = /(?:\$\s*([0-9][0-9.,]*)|(?:USD|CAD)\s*([0-9][0-9.,]*)|([0-9][0-9.,]*)\s*(USD|CAD)\b)/gi;
+  const candidates = lines.filter(line => taxSignal.test(line));
+  if (candidates.length === 0 && taxSignal.test(text)) candidates.push(text);
+
+  for (const line of candidates) {
+    amountPattern.lastIndex = 0;
+    let match;
+    while ((match = amountPattern.exec(line))) {
+      const before = line.slice(Math.max(0, match.index - 12), match.index);
+      if (/\btotal\s*[:(]?\s*$/i.test(before)) continue;
+
+      const amount = parseMoneyAmount(match[1] || match[2] || match[3]);
+      if (!Number.isFinite(amount)) continue;
+
+      const currency = (match[4] || (/\bCAD\b/i.test(line) ? 'CAD' : /\bUSD\b/i.test(line) ? 'USD' : 'USD')).toUpperCase();
+      return { ...entry, taxAmount: amount, taxCurrency: currency, taxDisplay: formatTaxDisplay(amount, currency) };
+    }
+  }
+
+  return { ...entry, taxAmount: null, taxCurrency: null, taxDisplay: null };
+}
+
+function enrichEntries(rawEntries) {
+  return rawEntries.map(extractTaxFromBody);
+}
+
 // ── Filter logic ───────────────────────────────────────────────────────────
 function getFiltered() {
   const q = state.search.trim().toLowerCase();
@@ -123,11 +186,8 @@ function renderStats(data) {
   const countries = new Set(data.map(e => e.country).filter(c => c !== 'Unknown')).size;
   const devices = new Set(data.map(e => e.device).filter(d => d !== 'Unknown')).size;
   const shipRate = data.length ? Math.round((shipped / data.length) * 100) : 0;
-
-  const leads = data
-    .filter(e => e.orderDate && e.confirmDate)
-    .map(e => (new Date(e.confirmDate) - new Date(e.orderDate)) / 86400000);
-  const avgLead = leads.length ? Math.round(leads.reduce((a, b) => a + b, 0) / leads.length) : 0;
+  const taxes = data.map(e => e.taxAmount).filter(Number.isFinite);
+  const avgTax = taxes.length ? taxes.reduce((a, b) => a + b, 0) / taxes.length : null;
 
   const cards = [
     { value: data.length, label: 'Reports', hint: 'matching filters', color: 'var(--accent)' },
@@ -135,7 +195,7 @@ function renderStats(data) {
     { value: confirmed, label: 'Confirmed', hint: 'awaiting label', color: 'var(--blue)' },
     { value: waiting, label: 'Waiting', hint: 'no email yet', color: 'var(--orange)' },
     { value: countries, label: 'Countries', hint: `${devices} device models`, color: 'var(--purple)' },
-    { value: avgLead ? avgLead + 'd' : '—', label: 'Avg lead', hint: 'order → confirm', color: 'var(--yellow)' },
+    { value: avgTax == null ? '—' : formatTaxDisplay(avgTax, 'USD'), label: 'Avg tax', hint: `${taxes.length} reported`, color: 'var(--yellow)' },
   ];
   document.getElementById('stat-cards').innerHTML = cards.map(c =>
     `<div class="stat-card" style="--stat-color:${c.color}"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="hint">${c.hint}</div></div>`
@@ -313,31 +373,30 @@ function chartBatch(data) {
   });
 }
 
-function chartLeadTime(data) {
-  destroyChart('leadTime');
-  const leads = data
-    .filter(e => e.orderDate && e.confirmDate)
-    .map(e => Math.round((new Date(e.confirmDate) - new Date(e.orderDate)) / 86400000))
-    .filter(n => n >= 0 && Number.isFinite(n));
+function chartTax(data) {
+  destroyChart('tax');
+  const taxes = data
+    .map(e => e.taxAmount)
+    .filter(amount => Number.isFinite(amount) && amount >= 0);
 
-  const bucketSize = 30;
+  const bucketSize = 10;
   const buckets = {};
-  leads.forEach(d => {
-    const k = Math.floor(d / bucketSize) * bucketSize;
+  taxes.forEach(amount => {
+    const k = Math.floor(amount / bucketSize) * bucketSize;
     buckets[k] = (buckets[k] || 0) + 1;
   });
   const keys = Object.keys(buckets).map(Number).sort((a, b) => a - b);
-  const labels = keys.map(k => `${k}–${k + bucketSize}d`);
+  const labels = keys.map(k => `$${k}–$${k + bucketSize}`);
   const values = keys.map(k => buckets[k]);
 
-  charts.leadTime = new Chart(document.getElementById('chartLeadTime'), {
+  charts.tax = new Chart(document.getElementById('chartTax'), {
     type: 'bar',
     data: {
       labels: labels.length ? labels : ['No data'],
       datasets: [{
         label: 'Reports',
         data: values.length ? values : [0],
-        backgroundColor: '#B197FC',
+        backgroundColor: '#FFD43B',
         borderRadius: 4,
       }]
     },
@@ -384,7 +443,7 @@ function renderCharts(data) {
   chartCountries(data);
   chartTimeline(data);
   chartBatch(data);
-  chartLeadTime(data);
+  chartTax(data);
   chartActivity(data);
 }
 
@@ -472,12 +531,28 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function orderedSortValue(entry) {
+  return entry.orderDateTime || (entry.orderDate ? `${entry.orderDate} 00:00` : null);
+}
+
+function confirmedSortValue(entry) {
+  return entry.confirmDateTime || (entry.confirmDate ? `${entry.confirmDate} 00:00` : null);
+}
+
+function displayOrderedDate(entry) {
+  return (entry.orderDateTime || entry.orderDate || '—').replace(/\s+UTC$/, '');
+}
+
+function displayConfirmedDate(entry) {
+  return (entry.confirmDateTime || entry.confirmDate || '—').replace(/\s+UTC$/, '');
+}
+
 function sortData(data) {
   const { column, asc } = state.sort;
   const dir = asc ? 1 : -1;
   return [...data].sort((a, b) => {
-    const av = a[column];
-    const bv = b[column];
+    const av = column === 'orderDate' ? orderedSortValue(a) : column === 'confirmDate' ? confirmedSortValue(a) : a[column];
+    const bv = column === 'orderDate' ? orderedSortValue(b) : column === 'confirmDate' ? confirmedSortValue(b) : b[column];
     // Push null/undefined/empty to the bottom
     const aEmpty = av == null || av === '' || av === 'Unknown';
     const bEmpty = bv == null || bv === '' || bv === 'Unknown';
@@ -501,7 +576,7 @@ function renderTable(data) {
   const tbody = document.querySelector('#data-table tbody');
 
   if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="empty-icon">∅</div>No reports match these filters.<br>Try clearing some to see more.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">∅</div>No reports match these filters.<br>Try clearing some to see more.</div></td></tr>`;
   } else {
     tbody.innerHTML = slice.map(e => {
       const k = keyOf(e);
@@ -515,10 +590,11 @@ function renderTable(data) {
     <td>${escapeHtml(e.country)}</td>
     <td>${e.batch !== 'Unknown' ? `<span class="badge ${batchClass(e.batch)}">${e.batch}</span>` : '<span class="badge badge-unknown">Unknown</span>'}</td>
     <td><span class="badge ${badgeClass(e.status)}">${e.status}</span></td>
-    <td>${e.orderDateTime || e.orderDate || '—'}</td>
-    <td>${e.confirmDateTime || e.confirmDate || '—'}</td>
+    <td>${escapeHtml(displayOrderedDate(e))}</td>
+    <td>${escapeHtml(displayConfirmedDate(e))}</td>
+    <td>${escapeHtml(e.taxDisplay || '—')}</td>
   </tr>
-  ${isOpen ? `<tr class="expand-row"><td colspan="8"><div class="expand-body"><div class="expand-meta"><span><strong>Posted</strong> ${new Date(e.created).toLocaleString()}</span><span><strong>Score</strong> ${e.score}</span>${e.shippingDate ? `<span><strong>Shipped</strong> ${e.shippingDateTime || e.shippingDate}</span>` : ''}</div>${escapeHtml(body)}</div></td></tr>` : ''}
+  ${isOpen ? `<tr class="expand-row"><td colspan="9"><div class="expand-body"><div class="expand-meta"><span><strong>Posted</strong> ${new Date(e.created).toLocaleString()}</span><span><strong>Score</strong> ${e.score}</span>${e.shippingDate ? `<span><strong>Shipped</strong> ${(e.shippingDateTime || e.shippingDate).replace(/\s+UTC$/, '')}</span>` : ''}${e.taxDisplay ? `<span><strong>Tax</strong> ${escapeHtml(e.taxDisplay)}</span>` : ''}</div>${escapeHtml(body)}</div></td></tr>` : ''}
   `;
     }).join('');
   }
@@ -614,7 +690,7 @@ async function init() {
   try {
     const live = await loadParsedData();
     post = live.post;
-    entries = live.entries;
+    entries = enrichEntries(live.entries);
     dataGeneratedAt = live.generatedAt || null;
     dataSource = 'live';
     setLoadingStatus('');
