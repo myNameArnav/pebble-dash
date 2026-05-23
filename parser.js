@@ -37,6 +37,7 @@ function normalizeCountry(value) {
     fr: 'France', fra: 'France',
     hu: 'Hungary', hun: 'Hungary', 'hungary hu': 'Hungary',
     nl: 'Netherlands', nld: 'Netherlands', 'the netherlands': 'Netherlands',
+    nz: 'New Zealand',
     uae: 'UAE', 'united arab emirates': 'UAE',
     dprk: 'North Korea', drc: 'DR Congo', 'democratic republic of the congo': 'DR Congo',
     holland: 'Netherlands', czechia: 'Czech Republic',
@@ -113,13 +114,14 @@ function inferCountry(entry, lines, text) {
       const match = line.match(pattern);
       if (!match) continue;
       const value = match[1].trim().replace(/[.,]+$/, '');
-      const normalized = normalizeCountry(value);
-      if (normalized !== value || ['US', 'UK', 'UAE'].includes(normalized)) {
-        return normalized;
-      }
-      if (countryNames.some(name => new RegExp(`^${name}$`, 'i').test(value))) {
-        return normalized;
-      }
+        const normalized = normalizeCountry(value);
+        if ((normalized !== value || ['US', 'UK', 'UAE'].includes(normalized)) &&
+            countryNames.some(name => new RegExp(`^${name}$`, 'i').test(normalized))) {
+          return normalized;
+        }
+        if (countryNames.some(name => new RegExp(`^${name}$`, 'i').test(value))) {
+          return normalized;
+        }
     }
     const normalizedLine = normalizeCountry(line);
     if (/^(?:us|usa|uk|gb|gbr|uae|au|aus|de|deu|cl|chl|fr|fra|hu|hun|nl|nld)$/i.test(line)) {
@@ -321,8 +323,9 @@ function buildUTCDateTimeDisplay(dateKey, fullText) {
 
 function parseDateString(value, options = {}) {
   if (!value) return null;
-  const { fallbackYear = null, preferDayFirst = false } = options;
+  const { fallbackYear = null, preferDayFirst = false, created = null } = options;
   const today = dateKeyFromDate(new Date());
+  const createdDate = created ? created.slice(0, 10) : null;
   const cleaned = String(value)
     .replace(/(\d+)(st|nd|rd|th)/gi, '$1')
     .replace(/[@,]/g, ' ')
@@ -332,7 +335,9 @@ function parseDateString(value, options = {}) {
     if (year < 2025 || year > 2027) return null;
     if (month < 1 || month > 12 || day < 1 || day > 31) return null;
     const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return dateKey <= today ? dateKey : null;
+    if (dateKey > today) return null;
+    if (createdDate && dateKey > createdDate) return null;
+    return dateKey;
   };
 
   const numeric = cleaned.match(/\b(\d{1,4})[\/.-](\d{1,2})[\/.-](\d{2,4})\b/);
@@ -363,9 +368,21 @@ function parseDateString(value, options = {}) {
       month = b;
       year = c;
     } else {
-      return null;
+      if (c < 100) c += c >= 70 ? 1900 : 2000;
+      month = a;
+      day = b;
+      year = c;
     }
-    return validDate(year, month, day);
+    const result = validDate(year, month, day);
+    // If ambiguous (both a and b <= 12) and result is null, try the alternative interpretation
+    if (!result && a <= 12 && b <= 12 && createdDate) {
+      const altYear = c < 100 ? c + (c >= 70 ? 1900 : 2000) : c;
+      const altMonth = preferDayFirst ? a : b;
+      const altDay = preferDayFirst ? b : a;
+      const altResult = validDate(altYear, altMonth, altDay);
+      if (altResult) return altResult;
+    }
+    return result;
   }
 
   const monthMap = {
@@ -452,7 +469,7 @@ function getFieldValue(line, fieldPattern) {
 }
 
 function hasNegativeFieldValue(lines, fieldPattern) {
-  const negativeValue = /\b(?:not\s+yet|no|nope|none|n\/a|na|pending|waiting|tbd|false)\b/i;
+  const negativeValue =     /\b(?:not\s+yet|no|nope|none|n\/a|na|pending|waiting|tbd|tba|false)\b/i;
   return lines.some(line => {
     const value = getFieldValue(line, fieldPattern);
     return value != null && negativeValue.test(value);
@@ -517,7 +534,7 @@ function inferStatus(entry, lines, text, confirmDate, shippingDate) {
   if (confirmDate && !confirmationNegative) return 'Confirmed';
 
   const confirmationText = withoutNegativeFieldLines(lines, 'confirmation|confirmed|confirm');
-  if (/\b(?:confirmation email|confirm email|confirmation received|order confirmation|address confirmed|color confirmed|colour confirmed|complete your order|finalize order|confirm choices|received.*email)\b/i.test(confirmationText)) {
+  if (/\b(?:confirmation email|confirm email|confirmation received|address confirmed|color confirmed|colour confirmed|complete your order|finalize order|confirm choices)\b/i.test(confirmationText)) {
     return 'Confirmed';
   }
   return entry.status || 'Unknown';
@@ -535,31 +552,33 @@ function normalizeEntry(entry) {
     /\bgmt\s*[+-]\s*\d{1,2}\b/i.test(text)
   );
 
+  const dateOptions = { fallbackYear, preferDayFirst: preferDayFirstDates, created: entry.created };
+
   const orderDate = entry.orderDate || extractDateFromLines(lines, [
     /\border(?:ed| date| time| date\/time)?\b/i,
     /\bpre-?order(?:ed)?\b/i
-  ], { fallbackYear, preferDayFirst: preferDayFirstDates });
+  ], dateOptions);
   const confirmDate = entry.confirmDate || extractDateFromLines(lines, [
     /\bconfirm/i,
     /\bconfirmation\b/i,
     /\bcomplete your order\b/i,
     /\bfinalize order\b/i
-  ], { fallbackYear, preferDayFirst: preferDayFirstDates });
+  ], dateOptions);
   const shippingDate = entry.shippingDate || extractDateFromLines(linesWithoutNegativeShippingUpdates(lines), [
     /\bshipping\b/i,
     /\bshipment\b/i,
     /\bshipped\b/i,
     /\btracking\b/i,
     /\bdelivered\b/i
-  ], { fallbackYear, preferDayFirst: preferDayFirstDates });
+  ], dateOptions);
 
   const orderPatterns = [/\border(?:ed| date| time| date\/time)?\b/i, /\bpre-?order(?:ed)?\b/i];
   const confirmPatterns = [/\bconfirm/i, /\bconfirmation\b/i, /\bcomplete your order\b/i, /\bfinalize order\b/i];
   const shippingPatterns = [/\bshipping\b/i, /\bshipment\b/i, /\bshipped\b/i, /\btracking\b/i, /\bdelivered\b/i];
 
-  const orderDateTime = extractDateTimeFromLines(lines, orderPatterns, orderDate, { fallbackYear, preferDayFirst: preferDayFirstDates });
-  const confirmDateTime = extractDateTimeFromLines(lines, confirmPatterns, confirmDate, { fallbackYear, preferDayFirst: preferDayFirstDates });
-  const shippingDateTime = extractDateTimeFromLines(linesWithoutNegativeShippingUpdates(lines), shippingPatterns, shippingDate, { fallbackYear, preferDayFirst: preferDayFirstDates });
+  const orderDateTime = extractDateTimeFromLines(lines, orderPatterns, orderDate, dateOptions);
+  const confirmDateTime = extractDateTimeFromLines(lines, confirmPatterns, confirmDate, dateOptions);
+  const shippingDateTime = extractDateTimeFromLines(linesWithoutNegativeShippingUpdates(lines), shippingPatterns, shippingDate, dateOptions);
 
   return {
     ...entry,
@@ -585,7 +604,7 @@ function isLikelyReport(entry) {
     entry.orderDate ||
     entry.confirmDate ||
     entry.shippingDate ||
-    entry.status !== 'Unknown' ||
+    entry.status === 'Shipped' ||
     entry.batch !== 'Unknown'
   );
   const hasDescriptorSignal = Boolean(
@@ -595,3 +614,5 @@ function isLikelyReport(entry) {
   );
   return hasTimelineSignal && hasDescriptorSignal;
 }
+
+export { normalizeEntry, isLikelyReport };
