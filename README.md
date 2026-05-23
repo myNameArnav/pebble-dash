@@ -6,4 +6,15 @@ Live tracking of the 2026 Pebble rollout, built from community-submitted reports
 
 ## How it works
 
-The dashboard fetches Reddit comments from the shipping mega thread, parses order details (device, color, country, batch, status), and visualizes the rollout progress with interactive charts and a filterable table.
+The dashboard loads parsed report data from a Cloudflare Worker. The Worker fetches Reddit comments from the shipping mega thread, parses order details (device, color, country, batch, status), caches the JSON response, and the frontend visualizes the rollout progress with interactive charts and a filterable table.
+
+## Cloudflare Worker
+
+Deploy the parser API with:
+
+```sh
+npm install
+npx wrangler deploy
+```
+
+The Worker serves parsed dashboard data at `/api/reports`. If the static site is hosted somewhere else, set `window.PEBBLE_DATA_API_URL` before loading `script.js`.

@@ -133,8 +133,10 @@
     · Click any row to view the full report
   </footer>
 
-  <script src="parser.js"></script>
-  <script src="script.js"></script>
+  <script>
+    window.PEBBLE_DATA_API_URL = 'https://pebble-shipping-data.arnjain3.workers.dev/api/reports';
+  </script>
+  <script type="module" src="script.js"></script>
 
 </body>
 
