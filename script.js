@@ -91,10 +91,11 @@ function renderPostInfo() {
   const parts = ['r/pebble'];
   if (post && post.created) parts.push(`posted ${new Date(post.created).toLocaleDateString()}`);
   parts.push(`${entries.length} reports ingested`);
-  if (dataGeneratedAt && dataSource === 'live') {
-    parts.push(`updated ${new Date(dataGeneratedAt).toLocaleString()}`);
+  if (dataSource === 'live') {
+    parts.push(dataGeneratedAt ? `last refreshed at ${new Date(dataGeneratedAt).toLocaleString()}` : 'live data loaded');
+  } else {
+    parts.push(dataSource === 'loading' ? (loadingMessage || 'fetching parsed data...') : 'offline');
   }
-  parts.push(dataSource === 'live' ? 'cached from Worker' : dataSource === 'loading' ? (loadingMessage || 'fetching parsed data...') : 'offline');
   document.getElementById('post-info').textContent = parts.join(' · ');
 }
 
