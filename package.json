@@ -1,6 +1,7 @@
 {
   "type": "module",
   "scripts": {
+    "build:pages": "sh scripts/build-pages.sh",
     "test": "node test_parser.js"
   },
   "devDependencies": {
