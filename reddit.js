@@ -1,10 +1,11 @@
 import { normalizeEntry, isLikelyReport } from './parser.js';
 
 export const THREAD_URL = 'https://www.reddit.com/r/pebble/comments/1sjk3c7/shipping_mega_thread';
-const THREAD_JSON_URL = `${THREAD_URL}.json`;
-const MORECHILDREN_URL = 'https://www.reddit.com/api/morechildren.json';
+const THREAD_PATH = '/r/pebble/comments/1sjk3c7/shipping_mega_thread';
+const REDDIT_ORIGINS = ['https://www.reddit.com', 'https://old.reddit.com'];
 const MORECHILDREN_BATCH = 100;
 const REDDIT_PAGE_DELAY_MS = 1000;
+const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; pebble-shipping-dashboard/1.0; +https://pebble-api.o-0.dev)';
 
 const STATUS_RANK = { Shipped: 3, Confirmed: 2, Waiting: 1, Unknown: 0 };
 
@@ -12,11 +13,18 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function redditHeaders() {
+function redditHeaders(options = {}) {
   return {
     Accept: 'application/json',
-    'User-Agent': 'pebble-shipping-dashboard/1.0'
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Cache-Control': 'no-cache',
+    Pragma: 'no-cache',
+    'User-Agent': options.userAgent || DEFAULT_USER_AGENT
   };
+}
+
+function redditUrl(origin, path) {
+  return `${origin}${path}`;
 }
 
 function parseTopLevelComment(node, acc) {
@@ -103,7 +111,19 @@ export function parseRedditThread(payload) {
   };
 }
 
-async function fetchRedditPage(after, fetcher) {
+async function fetchRedditJson(fetcher, path, params, options) {
+  let lastStatus = null;
+  for (const origin of REDDIT_ORIGINS) {
+    const response = await fetcher(`${redditUrl(origin, path)}?${params}`, {
+      headers: redditHeaders(options)
+    });
+    if (response.ok) return response.json();
+    lastStatus = response.status;
+  }
+  throw new Error(`Reddit fetch failed: ${lastStatus}`);
+}
+
+async function fetchRedditPage(after, fetcher, options) {
   const params = new URLSearchParams({
     limit: '100',
     raw_json: '1',
@@ -111,24 +131,19 @@ async function fetchRedditPage(after, fetcher) {
   });
   if (after) params.set('after', after);
 
-  const response = await fetcher(`${THREAD_JSON_URL}?${params}`, {
-    headers: redditHeaders()
-  });
-  if (!response.ok) {
-    throw new Error(`Reddit fetch failed: ${response.status}`);
-  }
-  return response.json();
+  return fetchRedditJson(fetcher, `${THREAD_PATH}.json`, params, options);
 }
 
-async function fetchAllTopLevelCommentPages({ fetcher, onProgress, delayMs }) {
+async function fetchAllTopLevelCommentPages({ fetcher, onProgress, delayMs, userAgent }) {
   let after = null;
   let firstPayload = null;
   const children = [];
+  const redditOptions = { userAgent };
 
   do {
     if (after) await delay(delayMs);
     onProgress?.(after ? 'Fetching next Reddit comment page...' : 'Fetching Reddit data...');
-    const payload = await fetchRedditPage(after, fetcher);
+    const payload = await fetchRedditPage(after, fetcher, redditOptions);
     if (!Array.isArray(payload) || payload.length < 2 || !payload[1]?.data) {
       throw new Error('Unexpected Reddit comments payload');
     }
@@ -145,9 +160,10 @@ async function fetchAllTopLevelCommentPages({ fetcher, onProgress, delayMs }) {
   return firstPayload;
 }
 
-async function expandTopLevelMoreChildren(linkId, initialChildren, { fetcher, onProgress, delayMs }) {
+async function expandTopLevelMoreChildren(linkId, initialChildren, { fetcher, onProgress, delayMs, userAgent }) {
   const out = [];
   const queue = [];
+  const redditOptions = { userAgent };
 
   for (const child of initialChildren) {
     if (child.kind === 't1') {
@@ -172,15 +188,13 @@ async function expandTopLevelMoreChildren(linkId, initialChildren, { fetcher, on
       children: ids.join(','),
       raw_json: '1'
     });
-    const response = await fetcher(`${MORECHILDREN_URL}?${params}`, {
-      headers: redditHeaders()
-    });
-    if (!response.ok) {
-      console.warn(`morechildren HTTP ${response.status}; keeping ${out.length} top-level comments fetched so far`);
+    let data = null;
+    try {
+      data = await fetchRedditJson(fetcher, '/api/morechildren.json', params, redditOptions);
+    } catch (error) {
+      console.warn(`${error instanceof Error ? error.message : String(error)}; keeping ${out.length} top-level comments fetched so far`);
       break;
     }
-
-    const data = await response.json();
     const things = data?.json?.data?.things || [];
     for (const thing of things) {
       if (thing.kind === 't1' && thing.data?.parent_id === linkId) {
@@ -205,14 +219,20 @@ export async function loadRedditData(options = {}) {
   const payload = await fetchAllTopLevelCommentPages({
     fetcher,
     onProgress: options.onProgress,
-    delayMs
+    delayMs,
+    userAgent: options.userAgent
   });
   const postData = payload[0]?.data?.children?.[0]?.data;
   if (postData?.id && payload[1]?.data) {
     payload[1].data.children = await expandTopLevelMoreChildren(
       `t3_${postData.id}`,
       payload[1].data.children || [],
-      { fetcher, onProgress: options.onProgress, delayMs }
+      {
+        fetcher,
+        onProgress: options.onProgress,
+        delayMs,
+        userAgent: options.userAgent
+      }
     );
   }
   return parseRedditThread(payload);

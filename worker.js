@@ -22,10 +22,11 @@ function jsonResponse(body, init = {}) {
   });
 }
 
-async function buildPayload() {
+async function buildPayload(env) {
   const data = await loadRedditData({
     fetcher: fetch,
-    delayMs: 1000
+    delayMs: 1000,
+    userAgent: env.REDDIT_USER_AGENT
   });
   return {
     ...data,
@@ -42,7 +43,7 @@ async function handleReports(request, env, ctx) {
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
-  const payload = await buildPayload();
+  const payload = await buildPayload(env);
   const response = jsonResponse(payload);
   ctx.waitUntil(cache.put(cacheKey, response.clone()));
   return response;
