@@ -45,67 +45,21 @@ const state = {
 const charts = {};
 const expandedRows = new Set();
 
-function parseMoneyAmount(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return null;
-  let normalized = raw.replace(/\s/g, '');
-  if (/^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(normalized)) {
-    normalized = normalized.replace(/,/g, '');
-  } else if (/^\d+,\d{1,2}$/.test(normalized)) {
-    normalized = normalized.replace(',', '.');
-  } else {
-    normalized = normalized.replace(/,/g, '');
-  }
-  const amount = Number(normalized);
-  return Number.isFinite(amount) ? amount : null;
-}
-
 function formatTaxDisplay(amount, currency) {
   if (!Number.isFinite(amount)) return null;
   const formatted = `$${amount.toLocaleString('en-US', { minimumFractionDigits: amount % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
   return currency && currency !== 'USD' ? `${formatted} ${currency}` : formatted;
 }
 
-function extractTaxFromBody(entry) {
-  if (Number.isFinite(entry.taxAmount)) {
-    const currency = entry.taxCurrency || 'USD';
-    return {
-      ...entry,
-      taxCurrency: currency,
-      taxDisplay: entry.taxDisplay || formatTaxDisplay(entry.taxAmount, currency)
-    };
-  }
-
-  const lines = String(entry.body || '')
-    .split('\n')
-    .map(line => line.replace(/[*_~`>#()[\]]/g, ' ').replace(/\s+/g, ' ').trim())
-    .filter(Boolean);
-  const text = lines.join(' ');
-  const taxSignal = /\b(?:tax|taxes|duty|duties|tariff|tariffs|tarrif|tarrifs|customs|vat|import\s+fees?|additional\s+charges?)\b/i;
-  const amountPattern = /(?:\$\s*([0-9][0-9.,]*)|(?:USD|CAD)\s*([0-9][0-9.,]*)|([0-9][0-9.,]*)\s*(USD|CAD)\b)/gi;
-  const candidates = lines.filter(line => taxSignal.test(line));
-  if (candidates.length === 0 && taxSignal.test(text)) candidates.push(text);
-
-  for (const line of candidates) {
-    amountPattern.lastIndex = 0;
-    let match;
-    while ((match = amountPattern.exec(line))) {
-      const before = line.slice(Math.max(0, match.index - 12), match.index);
-      if (/\btotal\s*[:(]?\s*$/i.test(before)) continue;
-
-      const amount = parseMoneyAmount(match[1] || match[2] || match[3]);
-      if (!Number.isFinite(amount)) continue;
-
-      const currency = (match[4] || (/\bCAD\b/i.test(line) ? 'CAD' : /\bUSD\b/i.test(line) ? 'USD' : 'USD')).toUpperCase();
-      return { ...entry, taxAmount: amount, taxCurrency: currency, taxDisplay: formatTaxDisplay(amount, currency) };
-    }
-  }
-
-  return { ...entry, taxAmount: null, taxCurrency: null, taxDisplay: null };
+function normalizeTaxFields(entry) {
+  const taxAmount = Number.isFinite(entry.taxAmount) ? entry.taxAmount : null;
+  const taxCurrency = taxAmount == null ? null : (entry.taxCurrency || 'USD');
+  const taxDisplay = entry.taxDisplay || entry.tax || (taxAmount == null ? null : formatTaxDisplay(taxAmount, taxCurrency));
+  return { ...entry, taxAmount, taxCurrency, taxDisplay, tax: taxDisplay };
 }
 
 function enrichEntries(rawEntries) {
-  return rawEntries.map(extractTaxFromBody);
+  return rawEntries.map(normalizeTaxFields);
 }
 
 // ── Filter logic ───────────────────────────────────────────────────────────

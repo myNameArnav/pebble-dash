@@ -651,6 +651,7 @@ function normalizeEntry(entry) {
     orderDateTime,
     confirmDateTime,
     shippingDateTime,
+    tax: tax.taxDisplay,
     ...tax,
     status: inferStatus(entry, lines, text, confirmDate, shippingDate)
   };
