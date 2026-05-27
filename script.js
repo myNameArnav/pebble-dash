@@ -40,10 +40,17 @@ const state = {
   search: '',
   sort: { column: 'created', asc: false },
   page: 1,
-  pageSize: 20,
+  pageSize: window.matchMedia('(max-width: 720px)').matches ? 10 : 20,
 };
 const charts = {};
 const expandedRows = new Set();
+const compactViewport = window.matchMedia('(max-width: 720px)');
+
+compactViewport.addEventListener('change', ev => {
+  state.pageSize = ev.matches ? 10 : 20;
+  state.page = 1;
+  renderAll();
+});
 
 function formatTaxDisplay(amount, currency) {
   if (!Number.isFinite(amount)) return null;
@@ -530,7 +537,7 @@ function renderTable(data) {
   const tbody = document.querySelector('#data-table tbody');
 
   if (!slice.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">∅</div>No reports match these filters.<br>Try clearing some to see more.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" data-label=""><div class="empty"><div class="empty-icon">∅</div>No reports match these filters.<br>Try clearing some to see more.</div></td></tr>`;
   } else {
     tbody.innerHTML = slice.map(e => {
       const k = keyOf(e);
@@ -538,17 +545,17 @@ function renderTable(data) {
       const body = e.body ? e.body.trim() : '(no body)';
       return `
   <tr class="data-row${isOpen ? ' expanded' : ''}" data-key="${escapeHtml(k)}">
-    <td>${escapeHtml(e.author)}</td>
-    <td>${escapeHtml(e.device)}</td>
-    <td>${escapeHtml(e.color)}</td>
-    <td>${escapeHtml(e.country)}</td>
-    <td>${e.batch !== 'Unknown' ? `<span class="badge ${batchClass(e.batch)}">${e.batch}</span>` : '<span class="badge badge-unknown">Unknown</span>'}</td>
-    <td><span class="badge ${badgeClass(e.status)}">${e.status}</span></td>
-    <td>${escapeHtml(displayOrderedDate(e))}</td>
-    <td>${escapeHtml(displayConfirmedDate(e))}</td>
-    <td>${escapeHtml(e.taxDisplay || '—')}</td>
+    <td data-label="Author">${escapeHtml(e.author)}</td>
+    <td data-label="Device">${escapeHtml(e.device)}</td>
+    <td data-label="Color">${escapeHtml(e.color)}</td>
+    <td data-label="Country">${escapeHtml(e.country)}</td>
+    <td data-label="Batch">${e.batch !== 'Unknown' ? `<span class="badge ${batchClass(e.batch)}">${e.batch}</span>` : '<span class="badge badge-unknown">Unknown</span>'}</td>
+    <td data-label="Status"><span class="badge ${badgeClass(e.status)}">${e.status}</span></td>
+    <td data-label="Ordered">${escapeHtml(displayOrderedDate(e))}</td>
+    <td data-label="Confirmed">${escapeHtml(displayConfirmedDate(e))}</td>
+    <td data-label="Tax">${escapeHtml(e.taxDisplay || '—')}</td>
   </tr>
-  ${isOpen ? `<tr class="expand-row"><td colspan="9"><div class="expand-body"><div class="expand-meta"><span><strong>Posted</strong> ${new Date(e.created).toLocaleString()}</span><span><strong>Score</strong> ${e.score}</span>${e.shippingDate ? `<span><strong>Shipped</strong> ${(e.shippingDateTime || e.shippingDate).replace(/\s+UTC$/, '')}</span>` : ''}${e.taxDisplay ? `<span><strong>Tax</strong> ${escapeHtml(e.taxDisplay)}</span>` : ''}</div>${escapeHtml(body)}</div></td></tr>` : ''}
+  ${isOpen ? `<tr class="expand-row"><td colspan="9" data-label=""><div class="expand-body"><div class="expand-meta"><span><strong>Posted</strong> ${new Date(e.created).toLocaleString()}</span><span><strong>Score</strong> ${e.score}</span>${e.shippingDate ? `<span><strong>Shipped</strong> ${(e.shippingDateTime || e.shippingDate).replace(/\s+UTC$/, '')}</span>` : ''}${e.taxDisplay ? `<span><strong>Tax</strong> ${escapeHtml(e.taxDisplay)}</span>` : ''}</div>${escapeHtml(body)}</div></td></tr>` : ''}
   `;
     }).join('');
   }

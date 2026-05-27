@@ -32,6 +32,8 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -45,6 +47,7 @@ body {
   min-height: 100vh;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 header {
@@ -57,7 +60,7 @@ header {
 header h1 {
   font-size: clamp(1.8rem, 4vw, 2.5rem);
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: var(--text);
 }
 
@@ -173,7 +176,7 @@ header .subtitle {
 .stat-card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 1.25rem 1rem;
   text-align: left;
   transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
@@ -210,7 +213,7 @@ header .subtitle {
   font-size: 2rem;
   font-weight: 800;
   margin-top: 0.5rem;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: var(--stat-color, var(--text));
 }
 
@@ -239,6 +242,15 @@ header .subtitle {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.6rem 0.75rem;
+}
+
+.filter-controls {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 0.75rem;
+  min-width: 0;
 }
 
 .filter-group {
@@ -370,7 +382,7 @@ header .subtitle {
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
@@ -432,7 +444,7 @@ header .subtitle {
   margin-top: 2rem;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 1rem;
 }
 
@@ -669,6 +681,275 @@ tbody tr.data-row.expanded td {
 .pagination .ellipsis {
   padding: 0 0.25rem;
   color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  body {
+    background-attachment: scroll;
+  }
+
+  header {
+    text-align: left;
+    padding: 1.35rem 1rem 0.75rem;
+  }
+
+  header h1 {
+    font-size: 1.55rem;
+    line-height: 1.15;
+  }
+
+  header .subtitle {
+    font-size: 0.9rem;
+    margin-top: 0.55rem;
+  }
+
+  #post-info {
+    font-size: 0.74rem;
+  }
+
+  .loading-status {
+    margin-left: 0;
+    margin-right: 0;
+    max-width: 100%;
+  }
+
+  .progress-wrap {
+    margin-top: 1.15rem;
+    padding: 0;
+  }
+
+  .progress-row {
+    align-items: flex-start;
+    gap: 0.75rem;
+    line-height: 1.35;
+  }
+
+  .stat-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+    margin: 1rem auto;
+  }
+
+  .stat-card {
+    min-width: 0;
+    padding: 0.8rem;
+  }
+
+  .stat-card .label,
+  .stat-card .hint {
+    font-size: 0.66rem;
+  }
+
+  .stat-card .value {
+    font-size: 1.45rem;
+    overflow-wrap: anywhere;
+  }
+
+  .filter-bar {
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .filter-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.55rem;
+  }
+
+  .filter-controls {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.5rem;
+    margin: 0 -0.75rem;
+    padding: 0 0.75rem 0.15rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .filter-controls::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-group {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 0.3rem;
+    align-items: center;
+    max-width: min(84vw, 420px);
+    overflow-x: auto;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.3rem;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .filter-group::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-label {
+    position: sticky;
+    left: -0.3rem;
+    z-index: 1;
+    align-self: stretch;
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-elev);
+    padding: 0 0.45rem;
+    margin-right: 0;
+  }
+
+  .chip {
+    min-height: 2.25rem;
+    padding: 0.42rem 0.7rem;
+  }
+
+  .search-wrap {
+    grid-column: 1;
+    grid-row: 1;
+    flex: none;
+    min-width: 0;
+    margin-left: 0;
+  }
+
+  .search-wrap input {
+    min-height: 2.45rem;
+    font-size: 1rem;
+  }
+
+  .filter-reset {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 2.45rem;
+    border-color: var(--border);
+    background: var(--card);
+  }
+
+  .dashboard {
+    padding: 0 0.75rem 2rem;
+  }
+
+  .charts-grid {
+    gap: 0.75rem;
+  }
+
+  .card {
+    padding: 0.9rem;
+  }
+
+  .card-head {
+    align-items: flex-start;
+  }
+
+  .card .card-hint {
+    white-space: normal;
+    text-align: right;
+  }
+
+  .card .chart-wrap {
+    min-height: 230px;
+  }
+
+  .table-wrap {
+    margin-top: 1rem;
+    padding: 0.75rem;
+  }
+
+  .table-scroll {
+    overflow: visible;
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: 100%;
+  }
+
+  thead {
+    display: none;
+  }
+
+  tbody tr.data-row {
+    margin-bottom: 0.65rem;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  tbody tr.data-row:hover td,
+  tbody tr.data-row.expanded td {
+    background: transparent;
+  }
+
+  td {
+    display: grid;
+    grid-template-columns: minmax(5.8rem, 36%) minmax(0, 1fr);
+    gap: 0.75rem;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+    overflow-wrap: anywhere;
+  }
+
+  td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  tr.data-row td:last-child {
+    border-bottom: none;
+  }
+
+  .expand-row {
+    margin: -0.35rem 0 0.75rem;
+  }
+
+  .expand-row td {
+    display: block;
+    padding: 0 !important;
+    border-bottom: none;
+  }
+
+  .expand-row td::before {
+    content: none;
+  }
+
+  .expand-body {
+    padding: 0.75rem;
+  }
+
+  .expand-meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+
+  .pagination {
+    align-items: stretch;
+  }
+
+  .pagination .pages {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.1rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pagination button {
+    min-width: 2.45rem;
+    min-height: 2.35rem;
+  }
 }
 
 .empty {
