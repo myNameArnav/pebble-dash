@@ -1,3 +1,10 @@
 name = "pebble-shipping-data"
 main = "worker.js"
 compatibility_date = "2026-05-23"
+
+[triggers]
+crons = [ "*/15 * * * *" ]
+
+[[kv_namespaces]]
+binding = "REPORTS_CACHE"
+id = "581acc5c08d54387b925e696ccdba514"

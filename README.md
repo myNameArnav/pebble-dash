@@ -18,3 +18,19 @@ npx wrangler deploy
 ```
 
 The Worker serves parsed dashboard data at `/api/reports`. The deployed dashboard points `window.PEBBLE_DATA_API_URL` at `https://pebble-api.o-0.dev/api/reports`.
+
+For persistent Worker-side caching, create a KV namespace and bind it as `REPORTS_CACHE`:
+
+```sh
+npx wrangler kv namespace create REPORTS_CACHE
+```
+
+Then add the returned namespace ID to `wrangler.toml`:
+
+```toml
+[[kv_namespaces]]
+binding = "REPORTS_CACHE"
+id = "<namespace-id>"
+```
+
+The Worker has a cron trigger that refreshes the cache every 10 minutes. Without the KV binding, it falls back to `caches.default`, which is still server-side but is not as durable or globally consistent as KV.
