@@ -55,6 +55,7 @@ function normalizeCountry(value) {
     trinidad: 'Trinidad and Tobago', 'trinidad & tobago': 'Trinidad and Tobago',
     'sao tome': 'Sao Tome and Principe',
     papua: 'Papua New Guinea', 'the gambia': 'Gambia',
+    hk: 'Hong Kong', 'hong kong': 'Hong Kong',
   };
   if (/\b(?:us|usa|united states)\b/i.test(v)) return 'US';
   return aliases[v] || toTitleCase(v);
@@ -106,7 +107,7 @@ function inferCountry(entry, lines, text) {
     'Turkey', 'Turkmenistan', 'Tuvalu', 'UAE', 'UK',
     'US', 'Uganda', 'Ukraine', 'Uruguay', 'Uzbekistan',
     'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam', 'Yemen',
-    'Zambia', 'Zimbabwe'
+    'Zambia', 'Zimbabwe', 'Hong Kong', 'Macao'
   ];
 
   for (const line of lines) {
@@ -114,14 +115,14 @@ function inferCountry(entry, lines, text) {
       const match = line.match(pattern);
       if (!match) continue;
       const value = match[1].trim().replace(/[.,]+$/, '');
-        const normalized = normalizeCountry(value);
-        if ((normalized !== value || ['US', 'UK', 'UAE'].includes(normalized)) &&
-            countryNames.some(name => new RegExp(`^${name}$`, 'i').test(normalized))) {
-          return normalized;
-        }
-        if (countryNames.some(name => new RegExp(`^${name}$`, 'i').test(value))) {
-          return normalized;
-        }
+      const normalized = normalizeCountry(value);
+      if ((normalized !== value || ['US', 'UK', 'UAE'].includes(normalized)) &&
+        countryNames.some(name => new RegExp(`^${name}$`, 'i').test(normalized))) {
+        return normalized;
+      }
+      if (countryNames.some(name => new RegExp(`^${name}$`, 'i').test(value))) {
+        return normalized;
+      }
     }
     const normalizedLine = normalizeCountry(line);
     if (/^(?:us|usa|uk|gb|gbr|uae|au|aus|de|deu|cl|chl|fr|fra|hu|hun|nl|nld)$/i.test(line)) {
@@ -213,7 +214,7 @@ function inferContinent(country) {
     Gambia: 'Africa', Benin: 'Africa', Togo: 'Africa', 'Cabo Verde': 'Africa',
     'Sao Tome and Principe': 'Africa', Eswatini: 'Africa', Lesotho: 'Africa',
     Mauritius: 'Africa', Seychelles: 'Africa', 'Central African Republic': 'Africa',
-    Comoros: 'Africa', Mauritania: 'Africa',
+    Comoros: 'Africa', Mauritania: 'Africa', 'Hong Kong': 'Asia', 'Macao': 'Asia'
   };
   return map[country] || 'Unknown';
 }
@@ -526,7 +527,7 @@ function getFieldValue(line, fieldPattern) {
 }
 
 function hasNegativeFieldValue(lines, fieldPattern) {
-  const negativeValue =     /\b(?:not\s+yet|no|nope|none|n\/a|na|pending|waiting|tbd|tba|false)\b/i;
+  const negativeValue = /\b(?:not\s+yet|no|nope|none|n\/a|na|pending|waiting|tbd|tba|false)\b/i;
   return lines.some(line => {
     const value = getFieldValue(line, fieldPattern);
     return value != null && negativeValue.test(value);
