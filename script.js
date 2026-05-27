@@ -487,6 +487,10 @@ filterToggle?.addEventListener('click', () => {
   const open = !filterControls.classList.contains('open');
   filterControls.classList.toggle('open', open);
   filterToggle.setAttribute('aria-expanded', String(open));
+  if (open && compactViewport.matches) {
+    filterControls.scrollTop = 0;
+    document.querySelector('.filter-bar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 });
 
 // ── Search (debounced) ────────────────────────────────────────────────────

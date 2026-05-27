@@ -891,10 +891,16 @@ tbody tr.data-row.expanded td {
     grid-row: 3;
     display: none;
     flex-direction: column;
+    flex-wrap: nowrap;
     align-items: stretch;
     gap: 0.65rem;
     width: 100%;
+    max-height: min(26rem, calc(100dvh - 12rem));
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding-top: 0.15rem;
+    padding-bottom: 0.25rem;
+    -webkit-overflow-scrolling: touch;
   }
 
   .filter-controls.open {
@@ -972,6 +978,10 @@ tbody tr.data-row.expanded td {
     grid-row: 2;
     display: inline-flex;
     min-height: 2.45rem;
+  }
+
+  .filter-inner:has(.filter-reset[data-empty]) .filter-toggle {
+    grid-column: 1 / -1;
   }
 
   .filter-reset {
