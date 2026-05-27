@@ -1,4 +1,5 @@
 import { normalizeEntry, isLikelyReport } from './parser.js';
+import { parseRedditThread } from './reddit.js';
 
 const testCases = [
   {
@@ -85,3 +86,42 @@ for (const testCase of testCases) {
 
 console.log(`\nResults: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);
+
+const thread = parseRedditThread([
+  {
+    data: {
+      children: [{
+        data: {
+          title: 'Shipping Mega Thread',
+          created_utc: 1770000000,
+          score: 42,
+          num_comments: 1
+        }
+      }]
+    }
+  },
+  {
+    data: {
+      children: [{
+        kind: 't1',
+        data: {
+          id: 'abc123',
+          link_id: 't3_post123',
+          author: 'test_user',
+          body: 'Model: Pebble Time 2\nOrdered: 2025-03-24\nBatch: 2\nDestination: Canada\nColor: Silver/Grey',
+          created_utc: 1770000001,
+          score: 5,
+          permalink: '/r/pebble/comments/post123/shipping_mega_thread/abc123/'
+        }
+      }]
+    }
+  }
+]);
+
+if (thread.entries[0]?.permalink !== 'https://www.reddit.com/r/pebble/comments/post123/shipping_mega_thread/abc123/') {
+  console.log('FAILURES:');
+  console.log(`  permalink: expected Reddit source URL, got ${JSON.stringify(thread.entries[0]?.permalink)}`);
+  process.exit(1);
+}
+
+console.log('Permalink test: PASS');

@@ -528,6 +528,12 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function sourceLink(entry) {
+  if (!entry.permalink) return '';
+  const url = escapeHtml(entry.permalink);
+  return `<a class="source-link" href="${url}" target="_blank" rel="noopener">Source</a>`;
+}
+
 function orderedSortValue(entry) {
   return entry.orderDateTime || (entry.orderDate ? `${entry.orderDate} 00:00` : null);
 }
@@ -579,6 +585,7 @@ function renderTable(data) {
       const k = keyOf(e);
       const isOpen = expandedRows.has(k);
       const body = e.body ? e.body.trim() : '(no body)';
+      const source = sourceLink(e);
       return `
   <tr class="data-row${isOpen ? ' expanded' : ''}" data-key="${escapeHtml(k)}">
     <td data-label="Author">${escapeHtml(e.author)}</td>
@@ -591,7 +598,7 @@ function renderTable(data) {
     <td data-label="Confirmed">${escapeHtml(displayConfirmedDate(e))}</td>
     <td data-label="Tax">${escapeHtml(e.taxDisplay || '—')}</td>
   </tr>
-  ${isOpen ? `<tr class="expand-row"><td colspan="9" data-label=""><div class="expand-body"><div class="expand-meta"><span><strong>Posted</strong> ${new Date(e.created).toLocaleString()}</span><span><strong>Score</strong> ${e.score}</span>${e.shippingDate ? `<span><strong>Shipped</strong> ${(e.shippingDateTime || e.shippingDate).replace(/\s+UTC$/, '')}</span>` : ''}${e.taxDisplay ? `<span><strong>Tax</strong> ${escapeHtml(e.taxDisplay)}</span>` : ''}</div>${escapeHtml(body)}</div></td></tr>` : ''}
+  ${isOpen ? `<tr class="expand-row"><td colspan="9" data-label=""><div class="expand-body"><div class="expand-meta"><span><strong>Posted</strong> ${new Date(e.created).toLocaleString()}</span><span><strong>Score</strong> ${e.score}</span>${e.shippingDate ? `<span><strong>Shipped</strong> ${(e.shippingDateTime || e.shippingDate).replace(/\s+UTC$/, '')}</span>` : ''}${e.taxDisplay ? `<span><strong>Tax</strong> ${escapeHtml(e.taxDisplay)}</span>` : ''}${source ? `<span>${source}</span>` : ''}</div>${escapeHtml(body)}</div></td></tr>` : ''}
   `;
     }).join('');
   }

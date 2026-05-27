@@ -27,6 +27,17 @@ function redditUrl(origin, path) {
   return `${origin}${path}`;
 }
 
+function commentPermalink(comment) {
+  if (comment.permalink) {
+    return redditUrl('https://www.reddit.com', comment.permalink);
+  }
+  if (comment.link_id && comment.id) {
+    const postId = String(comment.link_id).replace(/^t3_/, '');
+    return redditUrl('https://www.reddit.com', `/comments/${postId}/_/${comment.id}/`);
+  }
+  return null;
+}
+
 function parseTopLevelComment(node, acc) {
   if (!node || node.kind !== 't1' || !node.data) return;
   const c = node.data;
@@ -43,6 +54,7 @@ function parseTopLevelComment(node, acc) {
     orderDate: null,
     confirmDate: null,
     shippingDate: null,
+    permalink: commentPermalink(c),
     body: c.body
   });
   if (isLikelyReport(normalized)) {
