@@ -907,6 +907,15 @@ tbody tr.data-row.expanded td {
     letter-spacing: 0.06em;
   }
 
+  td > .badge {
+    justify-self: start;
+    align-self: center;
+    width: max-content;
+    max-width: 100%;
+    padding: 0.25rem 0.7rem;
+    font-size: 0.78rem;
+  }
+
   tr.data-row td:last-child {
     border-bottom: none;
   }
