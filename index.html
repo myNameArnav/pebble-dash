@@ -37,7 +37,7 @@
 
   <div class="filter-bar">
     <div class="filter-inner">
-      <div class="filter-controls" aria-label="Report filters">
+      <div class="filter-controls" id="filter-controls" aria-label="Report filters">
         <div class="filter-group" id="filter-status"><span class="filter-label">Status</span></div>
         <div class="filter-group" id="filter-batch"><span class="filter-label">Batch</span></div>
         <div class="filter-group" id="filter-device"><span class="filter-label">Device</span></div>
@@ -52,6 +52,11 @@
         </svg>
         <input id="search-input" type="search" placeholder="Search author, country, body…" aria-label="Search reports">
       </div>
+      <button class="filter-toggle" id="filter-toggle" type="button" aria-controls="filter-controls"
+        aria-expanded="false">
+        <span>Filters</span>
+        <span class="filter-active-count" id="filter-active-count" hidden></span>
+      </button>
       <button class="filter-reset" id="filter-reset" type="button">Reset</button>
     </div>
   </div>

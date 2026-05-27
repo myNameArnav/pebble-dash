@@ -45,10 +45,18 @@ const state = {
 const charts = {};
 const expandedRows = new Set();
 const compactViewport = window.matchMedia('(max-width: 720px)');
+const filterControls = document.getElementById('filter-controls');
+const filterToggle = document.getElementById('filter-toggle');
+const filterActiveCount = document.getElementById('filter-active-count');
+const filterReset = document.getElementById('filter-reset');
 
 compactViewport.addEventListener('change', ev => {
   state.pageSize = ev.matches ? 10 : 20;
   state.page = 1;
+  if (!ev.matches) {
+    filterControls?.classList.remove('open');
+    filterToggle?.setAttribute('aria-expanded', 'false');
+  }
   renderAll();
 });
 
@@ -459,7 +467,27 @@ function renderFilterChips() {
   buildChips('filter-device', 'device', 'Device', ['Pebble Duo 2', 'Pebble Time 2', 'Pebble Round', 'Pebble Index']);
   buildChips('filter-color', 'color', 'Color', ['Black/Grey', 'Silver/Grey', 'Black/Red', 'Silver/Blue']);
   buildChips('filter-continent', 'continent', 'Continent', ['Africa', 'Asia', 'Europe', 'North America', 'Oceania', 'South America']);
+  updateFilterSummary();
 }
+
+function activeFilterCount() {
+  return Object.values(state.filters).filter(value => value !== 'All').length + (state.search.trim() ? 1 : 0);
+}
+
+function updateFilterSummary() {
+  const count = activeFilterCount();
+  if (filterActiveCount) {
+    filterActiveCount.hidden = count === 0;
+    filterActiveCount.textContent = String(count);
+  }
+  filterReset?.toggleAttribute('data-empty', count === 0);
+}
+
+filterToggle?.addEventListener('click', () => {
+  const open = !filterControls.classList.contains('open');
+  filterControls.classList.toggle('open', open);
+  filterToggle.setAttribute('aria-expanded', String(open));
+});
 
 // ── Search (debounced) ────────────────────────────────────────────────────
 let searchTimer;
@@ -468,6 +496,7 @@ document.getElementById('search-input').addEventListener('input', ev => {
   searchTimer = setTimeout(() => {
     state.search = ev.target.value;
     state.page = 1;
+    updateFilterSummary();
     renderAll();
   }, 160);
 });
@@ -481,6 +510,9 @@ document.getElementById('filter-reset').addEventListener('click', () => {
   document.querySelectorAll('.filter-bar .chip').forEach(c => {
     c.classList.toggle('active', c.dataset.value === 'All');
   });
+  filterControls?.classList.remove('open');
+  filterToggle?.setAttribute('aria-expanded', 'false');
+  updateFilterSummary();
   renderAll();
 });
 
