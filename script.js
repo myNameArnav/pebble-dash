@@ -11,7 +11,7 @@ let dataGeneratedAt = null;
 
 // ── Color Palette ──────────────────────────────────────────────────────────
 const colors = {
-  status: { Shipped: '#69DB7C', Confirmed: '#74C0FC', Waiting: '#FFA94D', Unknown: '#8888aa' },
+  status: { Delivered: '#4ECDC4', Shipped: '#69DB7C', Confirmed: '#74C0FC', Waiting: '#FFA94D', Unknown: '#8888aa' },
   choropleth: ['#4ECDC4', '#74C0FC', '#B197FC', '#F783AC', '#FFA94D', '#69DB7C', '#FFD43B', '#FF6B6B', '#a0e7e5', '#c4b5fd', '#fbbf24', '#fb7185'],
   batch: { 'Batch 1': '#4ECDC4', 'Batch 2': '#B197FC', 'Batch 3': '#FFA94D', 'Batch 4': '#F783AC', 'Batch 5': '#FF6B6B' },
   device: { 'Pebble Duo 2': '#FFA94D', 'Pebble Time 2': '#4ECDC4', 'Pebble Round': '#74C0FC', 'Pebble Index': '#B197FC', 'Unknown': '#8888aa' },
@@ -134,41 +134,165 @@ function renderPostInfo() {
 // ── Progress bar ───────────────────────────────────────────────────────────
 function renderProgress(data) {
   const total = data.length;
+  const delivered = data.filter(e => e.status === 'Delivered').length;
   const shipped = data.filter(e => e.status === 'Shipped').length;
   const confirmed = data.filter(e => e.status === 'Confirmed').length;
   const waiting = data.filter(e => e.status === 'Waiting').length;
   const pct = n => total ? (n / total * 100) : 0;
   const bar = document.getElementById('progress-bar');
-  bar.children[0].style.width = pct(shipped) + '%';
-  bar.children[1].style.width = pct(confirmed) + '%';
-  bar.children[2].style.width = pct(waiting) + '%';
-  const done = shipped + confirmed;
+  bar.children[0].style.width = pct(delivered) + '%';
+  bar.children[1].style.width = pct(shipped) + '%';
+  bar.children[2].style.width = pct(confirmed) + '%';
+  bar.children[3].style.width = pct(waiting) + '%';
+  const done = delivered + shipped + confirmed;
   document.getElementById('progress-label').innerHTML =
     `<strong>${done}</strong> of <strong>${total}</strong> past confirmation (${Math.round(pct(done))}%)`;
 }
 
 // ── Stat cards ─────────────────────────────────────────────────────────────
 function renderStats(data) {
+  const delivered = data.filter(e => e.status === 'Delivered').length;
   const shipped = data.filter(e => e.status === 'Shipped').length;
   const confirmed = data.filter(e => e.status === 'Confirmed').length;
   const waiting = data.filter(e => e.status === 'Waiting').length;
   const countries = new Set(data.map(e => e.country).filter(c => c !== 'Unknown')).size;
   const devices = new Set(data.map(e => e.device).filter(d => d !== 'Unknown')).size;
-  const shipRate = data.length ? Math.round((shipped / data.length) * 100) : 0;
-  const taxes = data.map(e => e.taxAmount).filter(Number.isFinite);
-  const avgTax = taxes.length ? taxes.reduce((a, b) => a + b, 0) / taxes.length : null;
+  const deliveredRate = data.length ? Math.round((delivered / data.length) * 100) : 0;
+  const shipRate = data.length ? Math.round(((delivered + shipped) / data.length) * 100) : 0;
 
   const cards = [
     { value: data.length, label: 'Reports', hint: 'matching filters', color: 'var(--accent)' },
-    { value: shipped, label: 'Shipped', hint: `${shipRate}% of reports`, color: 'var(--green)' },
+    { value: delivered, label: 'Delivered', hint: `${deliveredRate}% of reports`, color: 'var(--accent)' },
+    { value: shipped, label: 'Shipped', hint: `${shipRate}% shipped+`, color: 'var(--green)' },
     { value: confirmed, label: 'Confirmed', hint: 'awaiting label', color: 'var(--blue)' },
     { value: waiting, label: 'Waiting', hint: 'no email yet', color: 'var(--orange)' },
     { value: countries, label: 'Countries', hint: `${devices} device models`, color: 'var(--purple)' },
-    { value: avgTax == null ? '—' : formatTaxDisplay(avgTax, 'USD'), label: 'Avg tax', hint: `${taxes.length} reported`, color: 'var(--yellow)' },
   ];
   document.getElementById('stat-cards').innerHTML = cards.map(c =>
     `<div class="stat-card" style="--stat-color:${c.color}"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="hint">${c.hint}</div></div>`
   ).join('');
+}
+
+// ── Insight panels ─────────────────────────────────────────────────────────
+function statusCounts(data) {
+  return data.reduce((acc, entry) => {
+    acc[entry.status] = (acc[entry.status] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function dateKey(value) {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+}
+
+function dayStartMs(value) {
+  const key = dateKey(value);
+  if (!key) return null;
+  const time = Date.parse(`${key}T00:00:00.000Z`);
+  return Number.isFinite(time) ? time : null;
+}
+
+function referenceTime() {
+  const generated = dataGeneratedAt ? Date.parse(dataGeneratedAt) : NaN;
+  return Number.isFinite(generated) ? generated : Date.now();
+}
+
+function countSince(data, field, sinceMs) {
+  return data.filter(entry => {
+    const time = dayStartMs(entry[field]);
+    return Number.isFinite(time) && time >= sinceMs;
+  }).length;
+}
+
+function renderBatchProgress(data) {
+  const container = document.getElementById('batch-progress');
+  const batches = ['Batch 1', 'Batch 2', 'Batch 3', 'Batch 4', 'Batch 5']
+    .map(batch => {
+      const rows = data.filter(entry => entry.batch === batch);
+      const counts = statusCounts(rows);
+      const delivered = counts.Delivered || 0;
+      const shipped = counts.Shipped || 0;
+      const confirmed = counts.Confirmed || 0;
+      const waiting = counts.Waiting || 0;
+      const done = delivered + shipped + confirmed;
+      return {
+        batch,
+        rows,
+        counts,
+        delivered,
+        shipped,
+        confirmed,
+        waiting,
+        done,
+        donePct: rows.length ? Math.round(done / rows.length * 100) : 0
+      };
+    })
+    .filter(item => item.rows.length);
+
+  if (!batches.length) {
+    container.innerHTML = '<div class="insight-empty">No batch data for these filters.</div>';
+    return;
+  }
+
+  container.innerHTML = batches.map(({ batch, rows, delivered, shipped, confirmed, waiting, done, donePct }) => {
+    const other = rows.length - delivered - shipped - confirmed - waiting;
+    const pct = count => rows.length ? (count / rows.length * 100) : 0;
+    return `
+      <div class="batch-row">
+        <div class="batch-row-head">
+          <span>${batch}</span>
+          <strong>${donePct}%</strong>
+        </div>
+        <div class="mini-progress" aria-label="${batch}: ${donePct}% past confirmation">
+          <span class="mini-seg delivered" style="width:${pct(delivered)}%"></span>
+          <span class="mini-seg shipped" style="width:${pct(shipped)}%"></span>
+          <span class="mini-seg confirmed" style="width:${pct(confirmed)}%"></span>
+          <span class="mini-seg waiting" style="width:${pct(waiting)}%"></span>
+          <span class="mini-seg unknown" style="width:${pct(other)}%"></span>
+        </div>
+        <div class="batch-row-meta">
+          <span>${rows.length} reports</span>
+          <span>${delivered} delivered</span>
+          <span>${shipped} shipped</span>
+          <span>${confirmed} confirmed</span>
+          <span>${waiting} waiting</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function daysBetween(start, end) {
+  const startMs = dayStartMs(start);
+  const endMs = dayStartMs(end);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return null;
+  return (endMs - startMs) / (24 * 60 * 60 * 1000);
+}
+
+function average(values) {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+}
+
+function recentMovementDays(data) {
+  const now = referenceTime();
+  const today = new Date(now);
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const dayMs = 24 * 60 * 60 * 1000;
+  const weekAgo = todayUtc - 6 * dayMs;
+  return Array.from({ length: 7 }, (_, index) => {
+    const time = weekAgo + index * dayMs;
+    const key = new Date(time).toISOString().slice(0, 10);
+    const shipped = data.filter(entry => dateKey(entry.shippingDate) === key).length;
+    const confirmed = data.filter(entry => dateKey(entry.confirmDate) === key).length;
+    const label = new Date(`${key}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'short' });
+    return { key, label, shipped, confirmed };
+  });
+}
+
+function renderInsights(data) {
+  renderBatchProgress(data);
 }
 
 // ── Chart factories ────────────────────────────────────────────────────────
@@ -178,7 +302,7 @@ function chartStatus(data) {
   destroyChart('status');
   const counts = {};
   data.forEach(e => { counts[e.status] = (counts[e.status] || 0) + 1; });
-  const order = ['Shipped', 'Confirmed', 'Waiting', 'Unknown'].filter(k => counts[k]);
+  const order = ['Delivered', 'Shipped', 'Confirmed', 'Waiting', 'Unknown'].filter(k => counts[k]);
   charts.status = new Chart(document.getElementById('chartStatus'), {
     type: 'doughnut',
     data: {
@@ -285,15 +409,23 @@ function chartTimeline(data) {
   const ordersByDay = groupByDate('orderDate');
   const confirmsByDay = groupByDate('confirmDate');
   const shipsByDay = groupByDate('shippingDate');
-  const allDates = new Set([...Object.keys(ordersByDay), ...Object.keys(confirmsByDay), ...Object.keys(shipsByDay)]);
+  const deliveriesByDay = {};
+  data.forEach(e => {
+    if (e.status !== 'Delivered') return;
+    const d = normalizeChartDate(e.shippingDate || e.created);
+    if (!d) return;
+    deliveriesByDay[d] = (deliveriesByDay[d] || 0) + 1;
+  });
+  const allDates = new Set([...Object.keys(ordersByDay), ...Object.keys(confirmsByDay), ...Object.keys(shipsByDay), ...Object.keys(deliveriesByDay)]);
   const sortedDates = [...allDates].sort((a, b) => Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`));
-  let o = 0, c = 0, s = 0;
-  const cumO = [], cumC = [], cumS = [];
+  let o = 0, c = 0, s = 0, delivered = 0;
+  const cumO = [], cumC = [], cumS = [], cumD = [];
   sortedDates.forEach(d => {
     o += ordersByDay[d] || 0;
     c += confirmsByDay[d] || 0;
     s += shipsByDay[d] || 0;
-    cumO.push(o); cumC.push(c); cumS.push(s);
+    delivered += deliveriesByDay[d] || 0;
+    cumO.push(o); cumC.push(c); cumS.push(s); cumD.push(delivered);
   });
   const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
   charts.timeline = new Chart(document.getElementById('chartTimeline'), {
@@ -304,6 +436,7 @@ function chartTimeline(data) {
         { label: 'Orders placed', data: cumO, borderColor: '#FFD43B', backgroundColor: 'rgba(255,212,59,0.1)', tension: 0.35, fill: true, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2 },
         { label: 'Confirmed', data: cumC, borderColor: '#74C0FC', backgroundColor: 'rgba(116,192,252,0.12)', tension: 0.35, fill: true, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2 },
         { label: 'Shipped', data: cumS, borderColor: '#69DB7C', backgroundColor: 'rgba(105,219,124,0.12)', tension: 0.35, fill: true, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2 },
+        { label: 'Delivered', data: cumD, borderColor: '#4ECDC4', backgroundColor: 'rgba(78,205,196,0.08)', tension: 0.35, fill: false, pointRadius: 0, pointHoverRadius: 4, borderWidth: 2 },
       ]
     },
     options: {
@@ -318,89 +451,105 @@ function chartTimeline(data) {
   });
 }
 
-function chartBatch(data) {
-  destroyChart('batch');
-  const batches = ['Batch 1', 'Batch 2', 'Batch 3', 'Batch 4', 'Batch 5'].filter(b => data.some(e => e.batch === b));
-  const statuses = ['Shipped', 'Confirmed', 'Waiting'];
-  const datasets = statuses.map(s => ({
-    label: s,
-    data: batches.map(b => data.filter(e => e.batch === b && e.status === s).length),
-    backgroundColor: colors.status[s],
-    borderRadius: 4, borderSkipped: false,
-  }));
-  charts.batch = new Chart(document.getElementById('chartBatch'), {
+function chartMomentum(data) {
+  destroyChart('momentum');
+  const days = recentMovementDays(data);
+  charts.momentum = new Chart(document.getElementById('chartMomentum'), {
     type: 'bar',
-    data: { labels: batches, datasets },
+    data: {
+      labels: days.map(day => day.label),
+      datasets: [
+        {
+          label: 'Confirmed',
+          data: days.map(day => day.confirmed),
+          backgroundColor: 'rgba(116,192,252,0.72)',
+          borderRadius: 4,
+        },
+        {
+          label: 'Shipped',
+          data: days.map(day => day.shipped),
+          backgroundColor: 'rgba(105,219,124,0.78)',
+          borderRadius: 4,
+        }
+      ]
+    },
     options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { padding: 10, usePointStyle: true, boxWidth: 7, font: { size: 10 } } } },
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            title: items => days[items[0].dataIndex]?.key || '',
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}`
+          }
+        }
+      },
       scales: {
         x: { grid: { display: false }, ticks: { color: '#8888aa' } },
-        y: { grid: { color: '#26263f' }, ticks: { color: '#8888aa', precision: 0 } }
+        y: { grid: { color: '#26263f' }, ticks: { color: '#8888aa', precision: 0 }, title: { display: true, text: 'Reports', color: '#7878a0', font: { size: 10 } } }
       }
     }
   });
 }
 
-function chartTax(data) {
-  destroyChart('tax');
-  const taxes = data
-    .map(e => e.taxAmount)
-    .filter(amount => Number.isFinite(amount) && amount >= 0);
+function chartCycleTime(data) {
+  destroyChart('cycleTime');
+  const steps = [
+    {
+      label: 'Order → Confirm',
+      values: data.map(entry => daysBetween(entry.orderDate, entry.confirmDate)).filter(Number.isFinite),
+      color: '#74C0FC'
+    },
+    {
+      label: 'Confirm → Ship',
+      values: data.map(entry => daysBetween(entry.confirmDate, entry.shippingDate)).filter(Number.isFinite),
+      color: '#69DB7C'
+    },
+    {
+      label: 'Ship → Deliver',
+      values: data
+        .filter(entry => entry.status === 'Delivered')
+        .map(entry => daysBetween(entry.shippingDate, entry.created))
+        .filter(Number.isFinite),
+      color: '#4ECDC4'
+    }
+  ].map(step => ({ ...step, avg: average(step.values) || 0 }));
 
-  const bucketSize = 10;
-  const buckets = {};
-  taxes.forEach(amount => {
-    const k = Math.floor(amount / bucketSize) * bucketSize;
-    buckets[k] = (buckets[k] || 0) + 1;
-  });
-  const keys = Object.keys(buckets).map(Number).sort((a, b) => a - b);
-  const labels = keys.map(k => `$${k}–$${k + bucketSize}`);
-  const values = keys.map(k => buckets[k]);
-
-  charts.tax = new Chart(document.getElementById('chartTax'), {
+  charts.cycleTime = new Chart(document.getElementById('chartCycleTime'), {
     type: 'bar',
     data: {
-      labels: labels.length ? labels : ['No data'],
+      labels: steps.map(step => step.label),
       datasets: [{
-        label: 'Reports',
-        data: values.length ? values : [0],
-        backgroundColor: '#FFD43B',
+        label: 'Average days',
+        data: steps.map(step => step.avg),
+        backgroundColor: steps.map(step => step.color),
         borderRadius: 4,
+        borderSkipped: false,
       }]
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} report${ctx.parsed.y === 1 ? '' : 's'}` } }
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const step = steps[ctx.dataIndex];
+              return ` ${Math.round(step.avg)} days avg from ${step.values.length} report${step.values.length === 1 ? '' : 's'}`;
+            }
+          }
+        }
       },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#8888aa', font: { size: 10 } } },
-        y: { grid: { color: '#26263f' }, ticks: { color: '#8888aa', precision: 0 } }
-      }
-    }
-  });
-}
-
-function chartActivity(data) {
-  destroyChart('activity');
-  const byDay = {};
-  data.forEach(e => { if (!e.created) return; const d = e.created.split('T')[0]; byDay[d] = (byDay[d] || 0) + 1; });
-  const sorted = Object.entries(byDay).sort((a, b) => a[0].localeCompare(b[0]));
-  const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  charts.activity = new Chart(document.getElementById('chartActivity'), {
-    type: 'bar',
-    data: {
-      labels: sorted.map(s => fmt(s[0])),
-      datasets: [{ label: 'Comments', data: sorted.map(s => s[1]), backgroundColor: '#B197FC', borderRadius: 4 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { color: '#8888aa', maxTicksLimit: 14, maxRotation: 0 } },
-        y: { grid: { color: '#26263f' }, ticks: { color: '#8888aa', precision: 0 } }
+        x: {
+          grid: { color: '#26263f' },
+          ticks: { color: '#8888aa', callback: value => `${value}d` },
+          title: { display: true, text: 'Average days', color: '#7878a0', font: { size: 10 } }
+        },
+        y: { grid: { display: false }, ticks: { color: '#8888aa' } }
       }
     }
   });
@@ -411,9 +560,8 @@ function renderCharts(data) {
   chartDeviceColor(data);
   chartCountries(data);
   chartTimeline(data);
-  chartBatch(data);
-  chartTax(data);
-  chartActivity(data);
+  chartMomentum(data);
+  chartCycleTime(data);
 }
 
 // ── Filter chips ───────────────────────────────────────────────────────────
@@ -462,10 +610,10 @@ function buildChips(containerId, key, label, values) {
 }
 
 function renderFilterChips() {
-  buildChips('filter-status', 'status', 'Status', ['Shipped', 'Confirmed', 'Waiting', 'Unknown']);
+  buildChips('filter-status', 'status', 'Status', ['Delivered', 'Shipped', 'Confirmed', 'Waiting', 'Unknown']);
   buildChips('filter-batch', 'batch', 'Batch', ['Batch 1', 'Batch 2', 'Batch 3', 'Batch 4', 'Batch 5']);
-  buildChips('filter-device', 'device', 'Device', ['Pebble Duo 2', 'Pebble Time 2', 'Pebble Round', 'Pebble Index']);
   buildChips('filter-color', 'color', 'Color', ['Black/Grey', 'Silver/Grey', 'Black/Red', 'Silver/Blue']);
+  buildChips('filter-device', 'device', 'Device', ['Pebble Duo 2', 'Pebble Time 2', 'Pebble Round', 'Pebble Index']);
   buildChips('filter-continent', 'continent', 'Continent', ['Africa', 'Asia', 'Europe', 'North America', 'Oceania', 'South America']);
   updateFilterSummary();
 }
@@ -521,7 +669,7 @@ document.getElementById('filter-reset').addEventListener('click', () => {
 });
 
 // ── Table helpers ──────────────────────────────────────────────────────────
-const badgeClass = s => ({ Shipped: 'badge-shipped', Confirmed: 'badge-confirmed', Waiting: 'badge-waiting', Unknown: 'badge-unknown' }[s] || 'badge-unknown');
+const badgeClass = s => ({ Delivered: 'badge-delivered', Shipped: 'badge-shipped', Confirmed: 'badge-confirmed', Waiting: 'badge-waiting', Unknown: 'badge-unknown' }[s] || 'badge-unknown');
 const batchClass = b => ({ 'Batch 1': 'badge-batch1', 'Batch 2': 'badge-batch2', 'Batch 3': 'badge-batch3', 'Batch 4': 'badge-batch4', 'Batch 5': 'badge-batch5' }[b] || '');
 
 function escapeHtml(s) {
@@ -683,6 +831,7 @@ function renderAll() {
   const data = getFiltered();
   renderProgress(data);
   renderStats(data);
+  renderInsights(data);
   renderCharts(data);
   renderTable(data);
 }

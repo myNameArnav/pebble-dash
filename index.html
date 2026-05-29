@@ -42,6 +42,7 @@
         <span id="progress-label"></span>
       </div>
       <div class="progress-bar" id="progress-bar">
+        <div class="progress-seg delivered"></div>
         <div class="progress-seg shipped"></div>
         <div class="progress-seg confirmed"></div>
         <div class="progress-seg waiting"></div>
@@ -56,8 +57,8 @@
       <div class="filter-controls" id="filter-controls" aria-label="Report filters">
         <div class="filter-group" id="filter-status"><span class="filter-label">Status</span></div>
         <div class="filter-group" id="filter-batch"><span class="filter-label">Batch</span></div>
-        <div class="filter-group" id="filter-device"><span class="filter-label">Device</span></div>
         <div class="filter-group" id="filter-color"><span class="filter-label">Color</span></div>
+        <div class="filter-group" id="filter-device"><span class="filter-label">Device</span></div>
         <div class="filter-group" id="filter-continent"><span class="filter-label">Continent</span></div>
       </div>
       <div class="search-wrap">
@@ -79,47 +80,47 @@
 
   <div class="dashboard">
     <div class="charts-grid">
-      <div class="card">
+      <div class="card card-status">
         <div class="card-head">
           <h3>Shipping Status</h3><span class="card-hint">Distribution</span>
         </div>
         <div class="chart-wrap"><canvas id="chartStatus"></canvas></div>
       </div>
-      <div class="card">
+      <div class="card card-model">
         <div class="card-head">
           <h3>Model &amp; Color</h3><span class="card-hint">Stacked</span>
         </div>
         <div class="chart-wrap"><canvas id="chartDeviceColor"></canvas></div>
       </div>
-      <div class="card">
+      <div class="card card-countries">
         <div class="card-head">
           <h3>Top Countries</h3><span class="card-hint">Top 12</span>
         </div>
         <div class="chart-wrap"><canvas id="chartCountries"></canvas></div>
       </div>
-      <div class="card wide">
+      <div class="card card-timeline">
         <div class="card-head">
-          <h3>Cumulative Timeline</h3><span class="card-hint">Orders → Confirmed → Shipped</span>
+          <h3>Cumulative Timeline</h3><span class="card-hint">Orders → Delivered</span>
         </div>
         <div class="chart-wrap"><canvas id="chartTimeline"></canvas></div>
       </div>
-      <div class="card">
+      <div class="card card-momentum">
         <div class="card-head">
-          <h3>Batch × Status</h3><span class="card-hint">Grouped</span>
+          <h3>Shipping Momentum</h3><span class="card-hint">Recent movement</span>
         </div>
-        <div class="chart-wrap"><canvas id="chartBatch"></canvas></div>
+        <div class="chart-wrap"><canvas id="chartMomentum"></canvas></div>
       </div>
-      <div class="card">
+      <div class="card card-batch">
         <div class="card-head">
-          <h3>Tax Paid</h3><span class="card-hint">Reported $ buckets</span>
+          <h3>Batch Progress</h3><span class="card-hint">Status by batch</span>
         </div>
-        <div class="chart-wrap"><canvas id="chartTax"></canvas></div>
+        <div class="insight-panel" id="batch-progress"></div>
       </div>
-      <div class="card wide">
+      <div class="card card-batch-summary">
         <div class="card-head">
-          <h3>Comment Activity</h3><span class="card-hint">Posts per day</span>
+          <h3>Cycle Time</h3><span class="card-hint">Average duration</span>
         </div>
-        <div class="chart-wrap"><canvas id="chartActivity"></canvas></div>
+        <div class="chart-wrap"><canvas id="chartCycleTime"></canvas></div>
       </div>
     </div>
 

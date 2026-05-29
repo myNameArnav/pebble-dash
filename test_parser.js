@@ -36,6 +36,84 @@ const testCases = [
     body: `PT2 Silver/Grey Ordered 3/18/2025 04:03:45 PM UTC, Batch 1, South Korea\nAdditional charges: Tarriffs - $38.14`,
     created: '2026-04-25T12:00:00Z',
     expected: { device: 'Pebble Time 2', color: 'Silver/Grey', country: 'South Korea', batch: 'Batch 1', tax: '$38.14', taxAmount: 38.14, taxDisplay: '$38.14', isLikelyReport: true }
+  },
+  {
+    body: `Model: Pebble Time 2\nOrdered: 2025-03-18\nBatch: 1\nDestination: US\nColor: Black/Grey\nShipped: yes\nArrived: yes`,
+    created: '2026-05-26T12:00:00Z',
+    expected: { device: 'Pebble Time 2', color: 'Black/Grey', country: 'US', batch: 'Batch 1', status: 'Delivered', isLikelyReport: true }
+  },
+  {
+    body: `Model: Pebble Time 2\nOrdered: 2025-03-18\nBatch: 1\nDestination: US\nColor: Black/Grey\nShipped: yes\nDelivered: not yet`,
+    created: '2026-05-26T12:00:00Z',
+    expected: { device: 'Pebble Time 2', color: 'Black/Grey', country: 'US', batch: 'Batch 1', status: 'Shipped', isLikelyReport: true }
+  },
+  {
+    body: `PT2 Black/Grey ordered 2025-03-20 batch 1 US. Got mine today, finally.`,
+    created: '2026-05-26T12:00:00Z',
+    expected: { device: 'Pebble Time 2', color: 'Black/Grey', country: 'US', batch: 'Batch 1', status: 'Delivered', isLikelyReport: true }
+  },
+  {
+    body: `• Model: Pebble Time 2
+
+• Ordered: 4/27/2026 07:20:47 PM UTC
+
+• Batch: 5
+
+• Destination: US
+
+• Color: Black
+
+• Confirmation: not yet
+
+• Shipped: not yet
+
+• Arrived: not yet`,
+    created: '2026-05-28T12:00:00Z',
+    expected: { device: 'Pebble Time 2', color: 'Black/Grey', country: 'US', batch: 'Batch 5', orderDate: '2026-04-27', orderDateTime: '2026-04-27 19:20 UTC', status: 'Waiting', isLikelyReport: true }
+  },
+  {
+    body: `WOOHOO! 
+
+Model: PT2  
+Ordered: 29/4/2025  
+Batch: 2  
+Destination: UK  
+Colour: Grey/Silver, Red/Black  
+Confirmation email: 13/05/2026  
+Shipped: SHIPPING EMAIL JUST ARRIVED - 22/05/26!!  
+Arrived: No, but "2 day shipping"`,
+    created: '2026-05-28T12:00:00Z',
+    expected: { device: 'Pebble Time 2', country: 'UK', batch: 'Batch 2', orderDate: '2025-04-29', confirmDate: '2026-05-13', shippingDate: '2026-05-22', status: 'Shipped', isLikelyReport: true }
+  },
+  {
+    body: `•	⁠Model: Pebble Time 2
+
+•	⁠Ordered: 2026-01-12 11:56:39 PM UTC 
+(Batch 4)
+
+•	⁠Destination: Pennsylvania USA 
+
+•	⁠Color: Silver/Grey
+
+•	⁠Confirmation Email: Not Yet
+
+•	⁠Shipped: Not Yet
+
+•	⁠Arrived: Not Yet`,
+    created: '2026-05-28T12:00:00Z',
+    expected: { device: 'Pebble Time 2', color: 'Silver/Grey', country: 'US', batch: 'Batch 4', orderDate: '2026-01-12', orderDateTime: '2026-01-12 23:56 UTC', status: 'Waiting', isLikelyReport: true }
+  },
+  {
+    body: `\\- Model: Pebble Round 2  
+\\- Ordered: 2026-01-31 12:00 UTC  
+\\- Batch: 1  
+\\- Destination: UK  
+\\- Color: Silver 20mm  
+\\- Confirmation Email: Not yet!  
+\\- Shipped: Not yet!  
+\\- Arrived: Not yet!`,
+    created: '2026-05-28T12:00:00Z',
+    expected: { device: 'Pebble Round', color: 'Silver/Grey', country: 'UK', batch: 'Batch 1', orderDate: '2026-01-31', orderDateTime: '2026-01-31 00:00 UTC', status: 'Waiting', isLikelyReport: true }
   }
 ];
 

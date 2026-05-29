@@ -4,7 +4,7 @@ function toTitleCase(value) {
 
 function cleanBodyText(body) {
   return String(body || '')
-    .replace(/[*_~`>#()[\]]/g, ' ')
+    .replace(/[\\•\u2060*_~`>#()[\]]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -12,7 +12,7 @@ function cleanBodyText(body) {
 function cleanLines(body) {
   return String(body || '')
     .split('\n')
-    .map(line => line.replace(/[*_~`>#()[\]]/g, ' ').replace(/\s+/g, ' ').trim())
+    .map(line => line.replace(/[\\•\u2060*_~`>#()[\]]/g, ' ').replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 }
 
@@ -559,8 +559,10 @@ function linesWithoutNegativeShippingUpdates(lines) {
 
 function inferStatus(entry, lines, text, confirmDate, shippingDate) {
   const shippingNegative = hasNegativeFieldValue(lines, 'shipped|shipping');
+  const deliveryNegative = hasNegativeFieldValue(lines, 'delivered|arrived|arrival');
   const confirmationNegative = hasNegativeFieldValue(lines, 'confirmation|confirmed|confirm');
-  const shippingPositive = hasPositiveFieldValue(lines, 'shipped|shipping|delivered');
+  const shippingPositive = hasPositiveFieldValue(lines, 'shipped|shipping');
+  const deliveryPositive = hasPositiveFieldValue(lines, 'delivered|arrived|arrival');
   const confirmationPositive = hasPositiveFieldValue(lines, 'confirmation|confirmed|confirm');
   const waitingPatterns = [
     /\bno shipping email yet\b/i,
@@ -580,6 +582,11 @@ function inferStatus(entry, lines, text, confirmDate, shippingDate) {
   const hasConfirmationSignal = Boolean(confirmDate || confirmationPositive);
   if (waitingPatterns.some(pattern => pattern.test(text)) || negativeShippingUpdate || (shippingNegative && (confirmationNegative || !hasConfirmationSignal))) {
     return 'Waiting';
+  }
+  const deliveryText = withoutNegativeFieldLines(lines, 'delivered|arrived|arrival');
+  if (deliveryPositive && !deliveryNegative) return 'Delivered';
+  if (/\b(?:delivered|watch arrived|pebble arrived|received my (?:watch|pebble)|got mine)\b/i.test(deliveryText)) {
+    return 'Delivered';
   }
   if (shippingPositive && !shippingNegative) return 'Shipped';
   if (shippingDate && !shippingNegative) return 'Shipped';
@@ -665,6 +672,7 @@ function isLikelyReport(entry) {
     entry.orderDate ||
     entry.confirmDate ||
     entry.shippingDate ||
+    entry.status === 'Delivered' ||
     entry.status === 'Shipped' ||
     entry.batch !== 'Unknown'
   );

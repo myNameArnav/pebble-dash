@@ -156,6 +156,10 @@ header .subtitle {
   background: var(--green);
 }
 
+.progress-seg.delivered {
+  background: var(--accent);
+}
+
 .progress-seg.confirmed {
   background: var(--blue);
 }
@@ -403,20 +407,66 @@ header .subtitle {
 
 .charts-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-areas:
+    "status status model model countries countries"
+    "timeline timeline timeline timeline momentum momentum"
+    "batch batch batch batchSummary batchSummary batchSummary";
   gap: 1rem;
 }
 
 @media (max-width: 900px) {
   .charts-grid {
     grid-template-columns: repeat(2, 1fr);
+    grid-template-areas:
+      "status model"
+      "countries countries"
+      "timeline timeline"
+      "momentum batchSummary"
+      "batch batch";
   }
 }
 
 @media (max-width: 600px) {
   .charts-grid {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "status"
+      "model"
+      "countries"
+      "timeline"
+      "momentum"
+      "batch"
+      "batchSummary";
   }
+}
+
+.card-status {
+  grid-area: status;
+}
+
+.card-model {
+  grid-area: model;
+}
+
+.card-countries {
+  grid-area: countries;
+}
+
+.card-timeline {
+  grid-area: timeline;
+}
+
+.card-batch {
+  grid-area: batch;
+}
+
+.card-momentum {
+  grid-area: momentum;
+}
+
+.card-batch-summary {
+  grid-area: batchSummary;
 }
 
 .card {
@@ -462,6 +512,84 @@ header .subtitle {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.insight-panel {
+  flex: 1;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.85rem;
+}
+
+.insight-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.batch-row {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.batch-row-head,
+.batch-row-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.batch-row-head {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.batch-row-head strong {
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.batch-row-meta {
+  color: var(--muted);
+  font-size: 0.68rem;
+  flex-wrap: wrap;
+}
+
+.mini-progress {
+  height: 0.55rem;
+  display: flex;
+  overflow: hidden;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.mini-seg {
+  min-width: 0;
+}
+
+.mini-seg.shipped {
+  background: var(--green);
+}
+
+.mini-seg.delivered {
+  background: var(--accent);
+}
+
+.mini-seg.confirmed {
+  background: var(--blue);
+}
+
+.mini-seg.waiting {
+  background: var(--orange);
+}
+
+.mini-seg.unknown {
+  background: var(--muted);
 }
 
 .card.wide {
@@ -635,6 +763,11 @@ tbody tr.data-row.expanded td {
   font-size: 0.7rem;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.badge-delivered {
+  background: rgba(78, 205, 196, 0.16);
+  color: var(--accent);
 }
 
 .badge-shipped {
@@ -822,6 +955,11 @@ tbody tr.data-row.expanded td {
   .card .chart-wrap {
     min-height: 250px;
   }
+
+  .insight-panel {
+    min-height: 250px;
+  }
+
 }
 
 @media (max-width: 720px) {
@@ -1029,6 +1167,10 @@ tbody tr.data-row.expanded td {
   }
 
   .card .chart-wrap {
+    min-height: 230px;
+  }
+
+  .insight-panel {
     min-height: 230px;
   }
 
