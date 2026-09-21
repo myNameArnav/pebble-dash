@@ -526,6 +526,16 @@ function getFieldValue(line, fieldPattern) {
   return match ? match[1] : null;
 }
 
+function extractDateFromFieldLines(lines, fieldPattern, options = {}) {
+  for (const line of lines) {
+    const value = getFieldValue(line, fieldPattern);
+    if (value == null) continue;
+    const parsed = parseDateString(value, options);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
 function hasNegativeFieldValue(lines, fieldPattern) {
   const negativeValue = /\b(?:not\s+yet|no|nope|none|n\/a|na|pending|waiting|tbd|tba|false)\b/i;
   return lines.some(line => {
@@ -557,7 +567,7 @@ function linesWithoutNegativeShippingUpdates(lines) {
   return lines.filter(line => !hasNegativeShippingUpdate(line));
 }
 
-function inferStatus(entry, lines, text, confirmDate, shippingDate) {
+function inferStatus(entry, lines, text, confirmDate, shippingDate, arrivalDate) {
   const shippingNegative = hasNegativeFieldValue(lines, 'shipped|shipping');
   const deliveryNegative = hasNegativeFieldValue(lines, 'delivered|arrived|arrival');
   const confirmationNegative = hasNegativeFieldValue(lines, 'confirmation|confirmed|confirm');
@@ -584,6 +594,7 @@ function inferStatus(entry, lines, text, confirmDate, shippingDate) {
     return 'Waiting';
   }
   const deliveryText = withoutNegativeFieldLines(lines, 'delivered|arrived|arrival');
+  if (arrivalDate && !deliveryNegative) return 'Delivered';
   if (deliveryPositive && !deliveryNegative) return 'Delivered';
   if (/\b(?:delivered|watch arrived|pebble arrived|received my (?:watch|pebble)|got mine)\b/i.test(deliveryText)) {
     return 'Delivered';
@@ -611,11 +622,14 @@ function normalizeEntry(entry) {
   const createdYear = entry.created ? new Date(entry.created).getUTCFullYear() : null;
   const fallbackYear = createdYear >= 2025 && createdYear <= 2027 ? createdYear : null;
   const country = inferCountry(entry, lines, text);
-  const preferDayFirstDates = country !== 'US' && (
+  const numericDates = [...text.matchAll(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-]\d{2,4}\b/g)];
+  const hasMonthFirstEvidence = numericDates.some(match => Number(match[1]) <= 12 && Number(match[2]) > 12);
+  const hasDayFirstEvidence = numericDates.some(match => Number(match[1]) > 12 && Number(match[2]) <= 12);
+  const preferDayFirstDates = hasDayFirstEvidence || (!hasMonthFirstEvidence && country !== 'US' && (
     country !== 'Unknown' ||
     /\bcolour\b/i.test(text) ||
     /\bgmt\s*[+-]\s*\d{1,2}\b/i.test(text)
-  );
+  ));
 
   const dateOptions = { fallbackYear, preferDayFirst: preferDayFirstDates, created: entry.created };
 
@@ -636,14 +650,21 @@ function normalizeEntry(entry) {
     /\btracking\b/i,
     /\bdelivered\b/i
   ], { ...dateOptions, allowAfterCreated: true });
+  const arrivalDate = entry.arrivalDate || extractDateFromFieldLines(
+    lines,
+    'delivered|arrived|arrival',
+    { ...dateOptions, allowAfterCreated: true }
+  );
 
   const orderPatterns = [/\border(?:ed| date| time| date\/time)?\b/i, /\bpre-?order(?:ed)?\b/i];
   const confirmPatterns = [/\bconfirm/i, /\bconfirmation\b/i, /\bcomplete your order\b/i, /\bfinalize order\b/i];
   const shippingPatterns = [/\bshipping\b/i, /\bshipment\b/i, /\bshipped\b/i, /\btracking\b/i, /\bdelivered\b/i];
+  const arrivalPatterns = [/\bdelivered\b/i, /\barrived\b/i, /\barrival\b/i];
 
   const orderDateTime = extractDateTimeFromLines(lines, orderPatterns, orderDate, dateOptions);
   const confirmDateTime = extractDateTimeFromLines(lines, confirmPatterns, confirmDate, { ...dateOptions, allowAfterCreated: true });
   const shippingDateTime = extractDateTimeFromLines(linesWithoutNegativeShippingUpdates(lines), shippingPatterns, shippingDate, { ...dateOptions, allowAfterCreated: true });
+  const arrivalDateTime = extractDateTimeFromLines(lines, arrivalPatterns, arrivalDate, { ...dateOptions, allowAfterCreated: true });
   const tax = extractTax(entry, lines, text);
 
   return {
@@ -656,12 +677,14 @@ function normalizeEntry(entry) {
     orderDate,
     confirmDate,
     shippingDate,
+    arrivalDate,
     orderDateTime,
     confirmDateTime,
     shippingDateTime,
+    arrivalDateTime,
     tax: tax.taxDisplay,
     ...tax,
-    status: inferStatus(entry, lines, text, confirmDate, shippingDate)
+    status: inferStatus(entry, lines, text, confirmDate, shippingDate, arrivalDate)
   };
 }
 
@@ -672,6 +695,7 @@ function isLikelyReport(entry) {
     entry.orderDate ||
     entry.confirmDate ||
     entry.shippingDate ||
+    entry.arrivalDate ||
     entry.status === 'Delivered' ||
     entry.status === 'Shipped' ||
     entry.batch !== 'Unknown'

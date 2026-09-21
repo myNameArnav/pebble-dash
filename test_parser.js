@@ -3,6 +3,53 @@ import { parseRedditThread } from './reddit.js';
 
 const testCases = [
   {
+    body: `Model: Pebble Time 2  \nOrdered: 3/18/2025  \nBatch: 1  \nDestination: USA  \nColor: Silver/Blue  \nConfirmation Email: 5/27/2026  \nShipped: 5/28/2026  \nArrived: 6/8/26`,
+    created: '2026-06-08T12:00:00Z',
+    expected: { device: 'Pebble Time 2', color: 'Silver/Blue', country: 'US', batch: 'Batch 1', orderDate: '2025-03-18', confirmDate: '2026-05-27', shippingDate: '2026-05-28', arrivalDate: '2026-06-08', status: 'Delivered', isLikelyReport: true }
+  },
+  {
+    body: `\\- Model: Pebble Time 2\n\n\\- Ordered: 2025-03-18 10:29 UTC\n\n\\- Batch: 1\n\n\\- Destination: Denmark\n\n\\- Color: Black/Grey\n\n\\- Confirmation Email: 2026-05-13 00:14 UTC\n\n\\- Shipped: 2026-05-19 14:26 UTC\n\n\\- Arrived: 2026-06-01 10:00 UTC`,
+    created: '2026-06-01T12:00:00Z',
+    expected: { color: 'Black/Grey', country: 'Denmark', orderDate: '2025-03-18', orderDateTime: '2025-03-18 10:29 UTC', confirmDate: '2026-05-13', confirmDateTime: '2026-05-13 00:14 UTC', shippingDate: '2026-05-19', shippingDateTime: '2026-05-19 14:26 UTC', arrivalDate: '2026-06-01', arrivalDateTime: '2026-06-01 10:00 UTC', status: 'Delivered' }
+  },
+  {
+    body: `Model: Pebble Time 2\n\nOrdered: 03/19/2025\n\nBatch: 1\n\nDestination: Bulgaria\n\nColor: Black/Grey\n\nConfirmation Email: 5/13/2026\n\nShipped: 05/19/2026\n\nArrived: 06/03/2026\n\nTax: $58.68\n\nImport Fees: $11.86\n\nShipping: $25.00`,
+    created: '2026-06-03T12:00:00Z',
+    expected: { color: 'Black/Grey', country: 'Bulgaria', orderDate: '2025-03-19', confirmDate: '2026-05-13', shippingDate: '2026-05-19', arrivalDate: '2026-06-03', tax: '$58.68', status: 'Delivered' }
+  },
+  {
+    body: `Model: Pebble Time 2\n\nOrdered: 2025-03-18\n\nBatch: 1\n\nDestination: Canada\n\nColor: Silver/Grey\n\nConfirmation email: 2026-05-27\n\nShipped: 2026-05-29\n\nArrived: 2026-06-06\n\nTax: $45.73`,
+    created: '2026-06-06T12:00:00Z',
+    expected: { color: 'Silver/Grey', country: 'Canada', orderDate: '2025-03-18', confirmDate: '2026-05-27', shippingDate: '2026-05-29', arrivalDate: '2026-06-06', tax: '$45.73', status: 'Delivered' }
+  },
+  {
+  "body": "Model: Pebble Time 2\nOrdered: 3/18/2025\nBatch: 1\nDestination: Germany\nColor: Black/Grey\nConfirmation Email: 4/24/2026\nShipped: 5/12/2026\nArrived: 5/22/2026",
+  "created": "2026-05-28T12:00:00Z",
+  "expected": {
+    "arrivalDate": "2026-05-22",
+    "status": "Delivered",
+    "isLikelyReport": true
+  }
+},
+  {
+  "body": "Model: Pebble Time 2\nOrdered: 3/18/2025 04:01:13 PM UTC\nBatch: 1\nDestination: Spain\nColor: Black/Grey\nConfirmation Email: 4/14/2026\nShipped: May 12 2026\n**Arrived: May 26 2026**",
+  "created": "2026-05-28T12:00:00Z",
+  "expected": {
+    "arrivalDate": "2026-05-26",
+    "status": "Delivered",
+    "isLikelyReport": true
+  }
+},
+  {
+  "body": "- Model: Pebble Time 2\n- Ordered: 2025-03-18 04:02:46 PM UTC\n- Batch: 1\n- Destination: Germany\n- Color: Black/Grey\n- Confirmation Email: 2026-04-14\n- Shipped: 2026-05-08\n- Arrived: 2026-05-15",
+  "created": "2026-05-28T12:00:00Z",
+  "expected": {
+    "arrivalDate": "2026-05-15",
+    "status": "Delivered",
+    "isLikelyReport": true
+  }
+},
+  {
     body: `Today I received an order confirmation and a request to pay taxes and delivery to Finland. Hopefully the delivery won't take many more weeks 😊👍🏼`,
     created: '2025-04-15T12:00:00Z',
     expected: { country: 'Finland', status: 'Unknown', isLikelyReport: false }
@@ -131,9 +178,11 @@ for (const testCase of testCases) {
     orderDate: result.orderDate,
     confirmDate: result.confirmDate,
     shippingDate: result.shippingDate,
+    arrivalDate: result.arrivalDate,
     orderDateTime: result.orderDateTime,
     confirmDateTime: result.confirmDateTime,
     shippingDateTime: result.shippingDateTime,
+    arrivalDateTime: result.arrivalDateTime,
     taxAmount: result.taxAmount,
     taxCurrency: result.taxCurrency,
     taxDisplay: result.taxDisplay,
